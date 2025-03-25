@@ -1,0 +1,3 @@
+CREATE DATABASE smartcanteen;
+CREATE USER admin WITH ENCRYPTED PASSWORD 'admin-pass';
+GRANT ALL PRIVILEGES ON DATABASE smartcanteen TO admin;
