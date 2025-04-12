@@ -18,6 +18,6 @@ api_router.include_router(graphql_app, prefix="/graphql")
 app.include_router(api_router, prefix="/api")
 
 # REST endpoint
-@app.get("/api/")
+@app.get("/api/hello")
 async def read_root():
     return {"message": "Hello from REST!"}
