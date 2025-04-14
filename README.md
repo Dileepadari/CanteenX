@@ -3,7 +3,7 @@ SE Project 3
 
 
 To Run just use:
-
+docker-compose down -v --remove-orphans
 docker-compose up --build
 
 or
