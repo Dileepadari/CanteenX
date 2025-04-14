@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MenuGrid from "../../components/menu/MenuGrid";
 import MenuFilters from "../../components/menu/MenuFilters";
 import OrderTracker from "../../components/orders/OrderTracker";
@@ -8,10 +8,46 @@ import PreOrderScheduler from "../../components/orders/PreOrderScheduler";
 import OrderHistory from "../../components/orders/OrderHistory";
 import CustomizationModal from "../../components/menu/CustomizationModal";
 import Navbar from "../../components/navbar";
+import { executeGraphQL } from "../../utils/graphql";
+import { GET_CANTEENS, GET_MENU_ITEMS, GET_FEATURED_MENU_ITEMS, GET_MENU_ITEMS_BY_CANTEEN } from "../../gql/queries/vendors";
+import { GET_USER_PROFILE } from "../../gql/queries/users";
 
-// Mock data for filters
-const mockCanteens = ['Central Canteen', 'North Campus', 'South Campus', 'West Block Cafe', 'Library Cafe'];
-const mockVendors = ['Indian Delights', 'Asian Wok', 'Sweet Treats', 'South Indian Kitchen', 'Biryani House', 'Coffee Corner'];
+// Define interfaces for type safety
+interface Canteen {
+  id: number;
+  name: string;
+  location?: string;
+  openingTime?: string;
+  closingTime?: string;
+}
+
+interface MenuItem {
+  id: number;
+  name: string;
+  description?: string;
+  price: number;
+  imageUrl?: string;
+  category?: string;
+  canteenId: number;
+  isAvailable: boolean;
+  isVegetarian: boolean;
+  isFeatured: boolean;
+}
+
+interface UserProfile {
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    profilePicture?: string;
+    preferredPayment?: string;
+  };
+  favoriteCanteenId?: number;
+  dietaryPreferences: string[];
+  recentOrders: number[];
+}
+
+// Mock data for filters (will be replaced by real data later)
 const mockCategories = ['Main Course', 'Rice', 'Dessert', 'Breakfast', 'Beverages'];
 const mockDietaryOptions = ['Vegetarian', 'Non-Vegetarian', 'Vegan', 'Gluten-Free', 'Contains Nuts', 'Spicy', 'Contains Dairy'];
 
@@ -152,14 +188,128 @@ export default function Home() {
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(2); // Mock cart item count
 
+  // State for GraphQL data
+  const [canteens, setCanteens] = useState<Canteen[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [featuredItems, setFeaturedItems] = useState<MenuItem[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [vendorsList, setVendorsList] = useState<string[]>([]);
+  const [selectedCanteenId, setSelectedCanteenId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState<{[key: string]: boolean}>({
+    canteens: false,
+    menuItems: false,
+    featuredItems: false,
+    userProfile: false
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch canteens data
+  useEffect(() => {
+    const getCanteens = async () => {
+      setIsLoading(prev => ({ ...prev, canteens: true }));
+      try {
+        const result = await executeGraphQL(GET_CANTEENS);
+        const canteensData = result.getCanteens;
+        console.log("Fetched canteens:", canteensData);
+        setCanteens(canteensData);
+        // Extract unique vendor names
+        if (canteensData && canteensData.length > 0) {
+          const vendors = Array.from(new Set(canteensData.map((c: Canteen) => c.name)));
+          setVendorsList(vendors);
+          // Set default selected canteen
+          setSelectedCanteenId(canteensData[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to fetch canteens:', err);
+        setError('Failed to load canteens. Please try again later.');
+      } finally {
+        setIsLoading(prev => ({ ...prev, canteens: false }));
+      }
+    };
+    
+    getCanteens();
+  }, []);
+
+  // Fetch featured menu items
+  useEffect(() => {
+    const getFeaturedItems = async () => {
+      setIsLoading(prev => ({ ...prev, featuredItems: true }));
+      try {
+        const result = await executeGraphQL(GET_FEATURED_MENU_ITEMS);
+        const itemsData = result.getFeaturedMenuItems;
+        console.log("Fetched featured items:", itemsData);
+        setFeaturedItems(itemsData);
+      } catch (err) {
+        console.error('Failed to fetch featured items:', err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, featuredItems: false }));
+      }
+    };
+    
+    getFeaturedItems();
+  }, []);
+
+  // Fetch menu items when canteen is selected
+  useEffect(() => {
+    if (selectedCanteenId) {
+      const getMenuItemsByCanteen = async () => {
+        setIsLoading(prev => ({ ...prev, menuItems: true }));
+        try {
+          const result = await executeGraphQL(GET_MENU_ITEMS_BY_CANTEEN, { canteenId: selectedCanteenId });
+          const itemsData = result.getMenuItemsByCanteen;
+          console.log(`Fetched menu items for canteen ${selectedCanteenId}:`, itemsData);
+          setMenuItems(itemsData);
+        } catch (err) {
+          console.error(`Failed to fetch menu items for canteen ${selectedCanteenId}:`, err);
+        } finally {
+          setIsLoading(prev => ({ ...prev, menuItems: false }));
+        }
+      };
+      
+      getMenuItemsByCanteen();
+    }
+  }, [selectedCanteenId]);
+
+  // Fetch user profile (mock user ID 1 for now)
+  useEffect(() => {
+    const getUserProfile = async () => {
+      const userId = 1; // Mock user ID - should come from auth context in real app
+      setIsLoading(prev => ({ ...prev, userProfile: true }));
+      try {
+        const result = await executeGraphQL(GET_USER_PROFILE, { userId });
+        const profileData = result.getUserProfile;
+        console.log("Fetched user profile:", profileData);
+        setUserProfile(profileData);
+        
+        // Set favorite canteen if available
+        if (profileData && profileData.favoriteCanteenId) {
+          setSelectedCanteenId(profileData.favoriteCanteenId);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user profile:', err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, userProfile: false }));
+      }
+    };
+    
+    getUserProfile();
+  }, []);
+
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters);
-    // In a real app, this would trigger an API call with the new filters
+    
+    // Handle canteen selection specifically
+    if (newFilters.canteen) {
+      const selectedCanteen = canteens.find(c => c.name === newFilters.canteen);
+      if (selectedCanteen) {
+        setSelectedCanteenId(selectedCanteen.id);
+      }
+    }
   };
 
   const handleSortChange = (newSortOption: string) => {
     setSortOption(newSortOption);
-    // In a real app, this would trigger an API call with the new sort option
+    // In a real app, this would reorder the items
   };
 
   const handleScheduleOrder = (date: Date, time: string, notes: string) => {
@@ -174,8 +324,10 @@ export default function Home() {
 
   const handleAddToCart = (customizedItem: any) => {
     console.log('Adding to cart:', customizedItem);
-    // In a real app, this would add the item to the cart in context
+    // In a real app, this would add the item to theh cart in context
   };
+
+  const isPageLoading = Object.values(isLoading).some(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -220,21 +372,65 @@ export default function Home() {
         <div className="mt-6">
           {activeTab === 'menu' && (
             <>
-              <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Campus Food Menu</h1>
-              <MenuFilters
-                canteens={mockCanteens}
-                vendors={mockVendors}
-                categories={mockCategories}
-                dietaryOptions={mockDietaryOptions}
-                onFilterChange={handleFilterChange}
-                onSortChange={handleSortChange}
-              />
+              <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+                {userProfile ? `Welcome back, ${userProfile.user.name}!` : 'Campus Food Menu'}
+              </h1>
+              
+              {/* Show loading indicator while data is loading */}
+              {isLoading.canteens ? (
+                <div className="flex justify-center items-center h-16 mb-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                </div>
+              ) : (
+                <MenuFilters
+                  canteens={canteens}
+                  vendors={vendorsList}
+                  categories={mockCategories}
+                  dietaryOptions={mockDietaryOptions}
+                  onFilterChange={handleFilterChange}
+                  onSortChange={handleSortChange}
+                  userPreferences={userProfile?.dietaryPreferences || []}
+                />
+              )}
+              
               {/* Pre-order scheduler */}
               <div className="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                 <PreOrderScheduler onSchedule={handleScheduleOrder} />
               </div>
+              
+              {/* Featured items section */}
+              {featuredItems.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Featured Items</h2>
+                  <div className="relative">
+                    {isLoading.featuredItems ? (
+                      <div className="flex justify-center items-center h-16">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                      </div>
+                    ) : (
+                      <MenuGrid 
+                        items={featuredItems}
+                        onItemClick={() => setIsCustomizationModalOpen(true)}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {/* Menu items grid */}
-              <MenuGrid />
+              <div>
+                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">All Menu Items</h2>
+                {isLoading.menuItems ? (
+                  <div className="flex justify-center items-center h-16">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  </div>
+                ) : (
+                  <MenuGrid 
+                    items={menuItems}
+                    onItemClick={() => setIsCustomizationModalOpen(true)}
+                  />
+                )}
+              </div>
             </>
           )}
 

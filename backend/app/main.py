@@ -2,10 +2,11 @@ from fastapi import FastAPI
 from fastapi.routing import APIRouter
 from strawberry.fastapi import GraphQLRouter
 import strawberry
+from strawberry.tools import create_type
 
-@strawberry.type
-class Query:
-    hello: str = "Hello from GraphQL!"
+from app.queries import queries
+
+Query = create_type("Query", queries)
 
 graphql_schema = strawberry.Schema(query=Query)
 graphql_app = GraphQLRouter(schema=graphql_schema)

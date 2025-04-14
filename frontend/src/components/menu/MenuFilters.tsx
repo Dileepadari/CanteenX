@@ -1,25 +1,31 @@
 import React, { useState } from 'react';
 
+// Define interface for Canteen objects to match the GraphQL query response
+interface Canteen {
+  id: number;
+  name: string;
+  location?: string;
+  opening_time?: string;
+  closing_time?: string;
+}
+
 interface MenuFiltersProps {
-  canteens: string[];
-  vendors: string[];
-  categories: string[];
-  dietaryOptions: string[];
+  canteens?: Canteen[];
+  categories?: string[];
+  dietaryOptions?: string[];
   onFilterChange: (filters: any) => void;
   onSortChange: (sortOption: string) => void;
 }
 
 export default function MenuFilters({
-  canteens,
-  vendors,
-  categories,
-  dietaryOptions,
+  canteens = [],
+  categories = [],
+  dietaryOptions = [],
   onFilterChange,
   onSortChange,
 }: MenuFiltersProps) {
   const [filters, setFilters] = useState({
     canteen: '',
-    vendor: '',
     category: '',
     dietaryOptions: [],
     availableOnly: false,
@@ -54,7 +60,6 @@ export default function MenuFilters({
   const handleClearFilters = () => {
     const resetFilters = {
       canteen: '',
-      vendor: '',
       category: '',
       dietaryOptions: [],
       availableOnly: false,
@@ -98,23 +103,8 @@ export default function MenuFilters({
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-gray-700 dark:text-white"
               >
                 <option value="">All Canteens</option>
-                {canteens.map((canteen) => (
-                  <option key={canteen} value={canteen}>{canteen}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Vendor Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vendor</label>
-              <select
-                value={filters.vendor}
-                onChange={(e) => handleFilterChange('vendor', e.target.value)}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-gray-700 dark:text-white"
-              >
-                <option value="">All Vendors</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor} value={vendor}>{vendor}</option>
+                {Array.isArray(canteens) && canteens.map((canteen) => (
+                  <option key={canteen.id} value={canteen.name}>{canteen.name}</option>
                 ))}
               </select>
             </div>
@@ -128,7 +118,7 @@ export default function MenuFilters({
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 text-gray-700 dark:text-white"
               >
                 <option value="">All Categories</option>
-                {categories.map((category) => (
+                {Array.isArray(categories) && categories.map((category) => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
@@ -155,7 +145,7 @@ export default function MenuFilters({
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dietary Preferences</label>
             <div className="flex flex-wrap gap-2">
-              {dietaryOptions.map((option) => (
+              {Array.isArray(dietaryOptions) && dietaryOptions.map((option) => (
                 <button
                   key={option}
                   onClick={() => handleDietaryOptionToggle(option)}
