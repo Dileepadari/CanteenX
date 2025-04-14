@@ -1,4 +1,4 @@
-qq/**
+/**
  * Utility function to execute GraphQL queries
  * 
  * @param {string} query - GraphQL query string
