@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import MenuGrid from "../../components/menu/MenuGrid";
 import MenuFilters from "../../components/menu/MenuFilters";
 import OrderTracker from "../../components/orders/OrderTracker";
@@ -9,6 +9,7 @@ import OrderHistory from "../../components/orders/OrderHistory";
 import CustomizationModal from "../../components/menu/CustomizationModal";
 import Navbar from "../../components/navbar";
 import { executeGraphQL } from "../../utils/graphql";
+import { processMenuItems } from "../../utils/menuFilters";
 import { GET_CANTEENS, GET_MENU_ITEMS, GET_FEATURED_MENU_ITEMS, GET_MENU_ITEMS_BY_CANTEEN } from "../../gql/queries/vendors";
 import { GET_USER_PROFILE } from "../../gql/queries/users";
 
@@ -183,7 +184,12 @@ const mockCustomizationOptions = {
 // TODO: Protect this route with authentication middleware and JWT token validation
 export default function Home() {
   const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'orders', 'history'
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = useState({
+    canteen: '',
+    category: '',
+    dietaryOptions: [],
+    availableOnly: false
+  });
   const [sortOption, setSortOption] = useState('popularity');
   const [isCustomizationModalOpen, setIsCustomizationModalOpen] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(2); // Mock cart item count
@@ -295,6 +301,26 @@ export default function Home() {
     getUserProfile();
   }, []);
 
+  // Apply filters and sort to menu items using memoization for efficiency
+  const filteredMenuItems = useMemo(() => {
+    return processMenuItems(menuItems, filters, sortOption, canteens);
+  }, [menuItems, filters, sortOption, canteens]);
+
+  // Apply filters and sort to featured items - but preserve featured status
+  const filteredFeaturedItems = useMemo(() => {
+    // Apply the same filtering as regular menu items, but maintain featured status
+    // This ensures consistent filtering behavior across both sections
+    return processMenuItems(featuredItems, filters, sortOption, canteens);
+  }, [featuredItems, filters, sortOption, canteens]);
+
+  // Show all original menu items when no filters are applied
+  const shouldShowAllItems = useMemo(() => {
+    return !filters.canteen && 
+           !filters.category && 
+           filters.dietaryOptions.length === 0 && 
+           !filters.availableOnly;
+  }, [filters]);
+
   const handleFilterChange = (newFilters: any) => {
     setFilters(newFilters);
     
@@ -309,7 +335,6 @@ export default function Home() {
 
   const handleSortChange = (newSortOption: string) => {
     setSortOption(newSortOption);
-    // In a real app, this would reorder the items
   };
 
   const handleScheduleOrder = (date: Date, time: string, notes: string) => {
@@ -324,7 +349,8 @@ export default function Home() {
 
   const handleAddToCart = (customizedItem: any) => {
     console.log('Adding to cart:', customizedItem);
-    // In a real app, this would add the item to theh cart in context
+    setCartItemCount(prevCount => prevCount + 1);
+    // In a real app, this would add the item to the cart in context
   };
 
   const isPageLoading = Object.values(isLoading).some(Boolean);
@@ -398,10 +424,12 @@ export default function Home() {
                 <PreOrderScheduler onSchedule={handleScheduleOrder} />
               </div>
               
-              {/* Featured items section */}
-              {featuredItems.length > 0 && (
+              {/* Featured items section - only show if we have items after filtering */}
+              {filteredFeaturedItems.length > 0 && (
                 <div className="mb-8">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Featured Items</h2>
+                  <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
+                    Featured Items {filters.dietaryOptions.length > 0 && `(${filters.dietaryOptions.join(', ')})`}
+                  </h2>
                   <div className="relative">
                     {isLoading.featuredItems ? (
                       <div className="flex justify-center items-center h-16">
@@ -409,7 +437,7 @@ export default function Home() {
                       </div>
                     ) : (
                       <MenuGrid 
-                        items={featuredItems}
+                        items={filteredFeaturedItems}
                         onItemClick={() => setIsCustomizationModalOpen(true)}
                       />
                     )}
@@ -419,16 +447,35 @@ export default function Home() {
               
               {/* Menu items grid */}
               <div>
-                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">All Menu Items</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white">
+                  All Menu Items {filters.dietaryOptions.length > 0 && `(${filters.dietaryOptions.join(', ')})`}
+                </h2>
                 {isLoading.menuItems ? (
                   <div className="flex justify-center items-center h-16">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                   </div>
-                ) : (
+                ) : filteredMenuItems.length > 0 ? (
                   <MenuGrid 
-                    items={menuItems}
+                    items={filteredMenuItems}
                     onItemClick={() => setIsCustomizationModalOpen(true)}
                   />
+                ) : (
+                  <div className="py-10 text-center">
+                    <p className="text-gray-500 dark:text-gray-400">
+                      No menu items match your filters. Try adjusting your filters.
+                    </p>
+                    <button
+                      onClick={handleFilterChange.bind(null, {
+                        canteen: '',
+                        category: '',
+                        dietaryOptions: [],
+                        availableOnly: false,
+                      })}
+                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
                 )}
               </div>
             </>

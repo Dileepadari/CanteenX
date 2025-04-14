@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Define interface for Canteen objects to match the GraphQL query response
 interface Canteen {
@@ -11,16 +11,20 @@ interface Canteen {
 
 interface MenuFiltersProps {
   canteens?: Canteen[];
+  vendors?: string[];
   categories?: string[];
   dietaryOptions?: string[];
+  userPreferences?: string[];
   onFilterChange: (filters: any) => void;
   onSortChange: (sortOption: string) => void;
 }
 
 export default function MenuFilters({
   canteens = [],
+  vendors = [],
   categories = [],
   dietaryOptions = [],
+  userPreferences = [],
   onFilterChange,
   onSortChange,
 }: MenuFiltersProps) {
@@ -32,6 +36,18 @@ export default function MenuFilters({
   });
   const [sortOption, setSortOption] = useState('popularity');
   const [isFiltersPanelOpen, setIsFiltersPanelOpen] = useState(false);
+  
+  // Set initial dietary preferences based on user preferences if available
+  useEffect(() => {
+    if (userPreferences && userPreferences.length > 0) {
+      setFilters(prev => ({
+        ...prev,
+        dietaryOptions: userPreferences.filter(pref => 
+          dietaryOptions.includes(pref)
+        )
+      }));
+    }
+  }, [userPreferences, dietaryOptions]);
 
   const handleFilterChange = (key: string, value: any) => {
     const newFilters = { ...filters, [key]: value };
@@ -87,9 +103,9 @@ export default function MenuFilters({
             <h3 className="text-lg font-semibold dark:text-white">Filters</h3>
             <button 
               onClick={handleClearFilters}
-              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
+              className="px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-300 rounded-md font-medium text-sm transition-colors duration-200"
             >
-              Clear All
+              Clear All Filters
             </button>
           </div>
 
@@ -159,6 +175,11 @@ export default function MenuFilters({
                 </button>
               ))}
             </div>
+            {filters.dietaryOptions.length > 0 && (
+              <div className="mt-2 text-xs text-indigo-600 dark:text-indigo-400">
+                Selected: {filters.dietaryOptions.join(', ')}
+              </div>
+            )}
           </div>
 
           {/* Available Only Toggle */}
