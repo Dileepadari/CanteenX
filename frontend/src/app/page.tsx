@@ -1,11 +1,6 @@
-import Image from "next/image";
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <>
-      <div>
-        Hi hello world! This is a jhqwkasdhoihso. This is changed keshav ver
-⁹      </div>
-    </>
-  );
+  // Redirect to admin dashboard
+  redirect('/admin/dashboard');
 }
