@@ -20,6 +20,7 @@ interface CartContextType {
   removeFromCart: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
+  setCartItems: (items: MenuItem[]) => void;
   getTotalPrice: () => number;
   getItemCount: () => number;
 }
@@ -36,6 +37,7 @@ const CartContext = createContext<CartContextType>({
   removeFromCart: () => {},
   updateQuantity: () => {},
   clearCart: () => {},
+  setCartItems: () => {},
   getTotalPrice: () => 0,
   getItemCount: () => 0,
 });
@@ -123,6 +125,7 @@ export function CartProvider({ children }: CartProviderProps) {
       removeFromCart,
       updateQuantity,
       clearCart,
+      setCartItems,
       getTotalPrice,
       getItemCount
     }}>

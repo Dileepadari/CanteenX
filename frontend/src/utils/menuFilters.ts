@@ -75,13 +75,11 @@ export function filterMenuItems(
         return false;
       }
       
-      // Note: Other dietary options (Gluten-Free, Contains Nuts, etc.) would need 
-      // additional item properties to filter effectively. For now, we just pass them through.
-    }
-
     return true;
-  });
+  }
+});
 }
+
 
 /**
  * Sort menu items based on sort option

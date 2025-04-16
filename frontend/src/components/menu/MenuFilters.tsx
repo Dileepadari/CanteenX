@@ -37,17 +37,8 @@ export default function MenuFilters({
   const [sortOption, setSortOption] = useState('popularity');
   const [isFiltersPanelOpen, setIsFiltersPanelOpen] = useState(false);
   
-  // Set initial dietary preferences based on user preferences if available
-  useEffect(() => {
-    if (userPreferences && userPreferences.length > 0) {
-      setFilters(prev => ({
-        ...prev,
-        dietaryOptions: userPreferences.filter(pref => 
-          dietaryOptions.includes(pref)
-        )
-      }));
-    }
-  }, [userPreferences, dietaryOptions]);
+  // Removed the automatic setting of dietary preferences based on user preferences
+  // This prevents filters from being pre-selected when the page loads
 
   const handleFilterChange = (key: string, value: any) => {
     const newFilters = { ...filters, [key]: value };

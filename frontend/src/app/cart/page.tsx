@@ -1,30 +1,102 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useCart } from '@/contexts/CartContext';
 import PreOrderScheduler from '@/components/orders/PreOrderScheduler';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navbar';
 import CartMockData from '@/components/demo/CartMockData';
+// Import GraphQL queries
+import { GET_CART_ITEMS, UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART } from '@/gql/queries/cart';
+import { executeGraphQL } from '@/utils/graphql';
 
 export default function CartPage() {
   const router = useRouter();
-  const { cartItems, removeFromCart, updateQuantity, getTotalPrice, clearCart, getItemCount } = useCart();
+  const { cartItems, removeFromCart, updateQuantity, getTotalPrice, clearCart, getItemCount, setCartItems } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  // For demo purposes, hardcoded userId - in a real app this would come from auth
+  const userId = 1; 
 
-  const handleQuantityChange = (id: string, newQuantity: number) => {
+  // Fetch cart items from backend when component mounts
+  useEffect(() => {
+    const fetchCartItems = async () => {
+      setIsLoading(true);
+      try {
+        // In a real-world app, we'd use the actual user ID from authentication
+        const response = await executeGraphQL(GET_CART_ITEMS, { userId });
+        
+        if (response?.getCartItems?.items) {
+          // If we have real cart data from the backend, use it
+          const backendItems = response.getCartItems.items.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            image: item.image,
+            description: item.description,
+            customizations: item.customizations ? JSON.parse(item.customizations) : {},
+            vendorName: item.vendorName
+          }));
+          
+          // Only update if we have items from backend and cart is empty
+          if (backendItems.length > 0 && cartItems.length === 0) {
+            setCartItems(backendItems);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching cart items:', error);
+        // If API fails, fall back to mock data
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCartItems();
+  }, []);
+
+  const handleQuantityChange = async (id: string, newQuantity: number) => {
     if (newQuantity < 1) {
-      removeFromCart(id);
+      await handleRemoveItem(id);
     } else {
+      // Update locally first for better UX
       updateQuantity(id, newQuantity);
+      
+      // Then update on backend
+      try {
+        await executeGraphQL(UPDATE_CART_ITEM, {
+          userId,
+          cartItemId: parseInt(id),
+          quantity: newQuantity
+        });
+      } catch (error) {
+        console.error('Error updating cart item:', error);
+        // Revert local change if API fails
+        const originalItem = cartItems.find(item => item.id === id);
+        if (originalItem) {
+          updateQuantity(id, originalItem.quantity);
+        }
+      }
     }
   };
 
-  const handleRemoveItem = (id: string) => {
+  const handleRemoveItem = async (id: string) => {
+    // Remove locally first for better UX
     removeFromCart(id);
+    
+    // Then remove on backend
+    try {
+      await executeGraphQL(REMOVE_FROM_CART, {
+        userId,
+        cartItemId: parseInt(id)
+      });
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      // No need to revert as user intended to remove
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -46,6 +118,9 @@ export default function CartPage() {
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Clear cart in backend too
+      await executeGraphQL(CLEAR_CART, { userId });
       
       setOrderSuccess(true);
       clearCart();
@@ -102,8 +177,8 @@ export default function CartPage() {
 
   return (
     <>
-      {/* Include CartMockData component to populate demo data */}
-      <CartMockData />
+      {/* Only include mock data in development */}
+      {process.env.NODE_ENV === 'development' && <CartMockData />}
       
       {/* Include Navbar with cart count */}
       <Navbar cartItemCount={getItemCount()} />
@@ -112,7 +187,16 @@ export default function CartPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">Your Cart</h1>
           
-          {cartItems.length === 0 ? (
+          {isLoading ? (
+            <div className="mt-12 text-center py-12 bg-white dark:bg-gray-800 shadow rounded-lg">
+              <svg className="animate-spin mx-auto h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading your cart...</p>
+            </div>
+          ) : cartItems.length === 0 ? (
+            // Empty cart view
             <div className="mt-12 text-center py-12 bg-white dark:bg-gray-800 shadow rounded-lg">
               <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -129,6 +213,7 @@ export default function CartPage() {
               </div>
             </div>
           ) : (
+            // Cart items view
             <div className="mt-12 lg:grid lg:grid-cols-12 lg:gap-x-8">
               <div className="lg:col-span-8">
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4">

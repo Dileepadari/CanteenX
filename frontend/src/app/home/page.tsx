@@ -12,6 +12,7 @@ import { executeGraphQL } from "../../utils/graphql";
 import { processMenuItems } from "../../utils/menuFilters";
 import { GET_CANTEENS, GET_MENU_ITEMS, GET_FEATURED_MENU_ITEMS, GET_MENU_ITEMS_BY_CANTEEN } from "../../gql/queries/vendors";
 import { GET_USER_PROFILE } from "../../gql/queries/users";
+import { GET_ACTIVE_ORDERS, GET_ORDER_HISTORY } from "../../gql/queries/orders";
 
 // Define interfaces for type safety
 interface Canteen {
@@ -201,11 +202,18 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [vendorsList, setVendorsList] = useState<string[]>([]);
   const [selectedCanteenId, setSelectedCanteenId] = useState<number | null>(null);
+  
+  // State for orders
+  const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  
   const [isLoading, setIsLoading] = useState<{[key: string]: boolean}>({
     canteens: false,
     menuItems: false,
     featuredItems: false,
-    userProfile: false
+    userProfile: false,
+    activeOrders: false,
+    orderHistory: false
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -222,8 +230,8 @@ export default function Home() {
         if (canteensData && canteensData.length > 0) {
           const vendors = Array.from(new Set(canteensData.map((c: Canteen) => c.name)));
           setVendorsList(vendors);
-          // Set default selected canteen
-          setSelectedCanteenId(canteensData[0].id);
+          // Removed automatic selection of the first canteen
+          // This ensures no filter is pre-selected when page loads
         }
       } catch (err) {
         console.error('Failed to fetch canteens:', err);
@@ -255,24 +263,30 @@ export default function Home() {
     getFeaturedItems();
   }, []);
 
-  // Fetch menu items when canteen is selected
+  // Fetch all menu items instead of filtering by canteen
+  useEffect(() => {
+    const getMenuItems = async () => {
+      setIsLoading(prev => ({ ...prev, menuItems: true }));
+      try {
+        const result = await executeGraphQL(GET_MENU_ITEMS);
+        const itemsData = result.getMenuItems;
+        console.log(`Fetched all menu items:`, itemsData);
+        setMenuItems(itemsData);
+      } catch (err) {
+        console.error(`Failed to fetch menu items:`, err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, menuItems: false }));
+      }
+    };
+    
+    getMenuItems();
+  }, []);
+
+  // Set selected canteen ID when changed through filters
   useEffect(() => {
     if (selectedCanteenId) {
-      const getMenuItemsByCanteen = async () => {
-        setIsLoading(prev => ({ ...prev, menuItems: true }));
-        try {
-          const result = await executeGraphQL(GET_MENU_ITEMS_BY_CANTEEN, { canteenId: selectedCanteenId });
-          const itemsData = result.getMenuItemsByCanteen;
-          console.log(`Fetched menu items for canteen ${selectedCanteenId}:`, itemsData);
-          setMenuItems(itemsData);
-        } catch (err) {
-          console.error(`Failed to fetch menu items for canteen ${selectedCanteenId}:`, err);
-        } finally {
-          setIsLoading(prev => ({ ...prev, menuItems: false }));
-        }
-      };
-      
-      getMenuItemsByCanteen();
+      console.log(`Selected canteen changed to: ${selectedCanteenId}`);
+      // We no longer need to fetch menu items by canteen - filtering is handled by processMenuItems
     }
   }, [selectedCanteenId]);
 
@@ -287,10 +301,8 @@ export default function Home() {
         console.log("Fetched user profile:", profileData);
         setUserProfile(profileData);
         
-        // Set favorite canteen if available
-        if (profileData && profileData.favoriteCanteenId) {
-          setSelectedCanteenId(profileData.favoriteCanteenId);
-        }
+        // Removed automatic setting of favorite canteen
+        // This ensures no filter is pre-selected when page loads
       } catch (err) {
         console.error('Failed to fetch user profile:', err);
       } finally {
@@ -300,6 +312,50 @@ export default function Home() {
     
     getUserProfile();
   }, []);
+
+  // Fetch active orders
+  useEffect(() => {
+    const getActiveOrders = async () => {
+      const userId = 1; // Mock user ID - should come from auth context in real app
+      setIsLoading(prev => ({ ...prev, activeOrders: true }));
+      try {
+        const result = await executeGraphQL(GET_ACTIVE_ORDERS, { userId });
+        const ordersData = result.getActiveOrders;
+        console.log("Fetched active orders:", ordersData);
+        setActiveOrders(ordersData);
+      } catch (err) {
+        console.error('Failed to fetch active orders:', err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, activeOrders: false }));
+      }
+    };
+    
+    if (activeTab === 'orders') {
+      getActiveOrders();
+    }
+  }, [activeTab]);
+
+  // Fetch order history
+  useEffect(() => {
+    const getOrderHistory = async () => {
+      const userId = 1; // Mock user ID - should come from auth context in real app
+      setIsLoading(prev => ({ ...prev, orderHistory: true }));
+      try {
+        const result = await executeGraphQL(GET_ORDER_HISTORY, { userId });
+        const historyData = result.getOrderHistory;
+        console.log("Fetched order history:", historyData);
+        setOrderHistory(historyData);
+      } catch (err) {
+        console.error('Failed to fetch order history:', err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, orderHistory: false }));
+      }
+    };
+    
+    if (activeTab === 'history') {
+      getOrderHistory();
+    }
+  }, [activeTab]);
 
   // Apply filters and sort to menu items using memoization for efficiency
   const filteredMenuItems = useMemo(() => {
@@ -484,26 +540,64 @@ export default function Home() {
           {activeTab === 'orders' && (
             <>
               <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Active Orders</h1>
-              <div className="max-w-3xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <OrderTracker
-                  orderId={mockActiveOrder.orderId}
-                  estimatedDeliveryTime={mockActiveOrder.estimatedDeliveryTime}
-                  currentStatus={mockActiveOrder.currentStatus}
-                  steps={mockActiveOrder.steps}
-                />
-              </div>
+              {isLoading.activeOrders ? (
+                <div className="flex justify-center items-center h-48">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                </div>
+              ) : activeOrders.length > 0 ? (
+                <div className="max-w-3xl mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                  {/* We're mapping through activeOrders in case the user has multiple active orders */}
+                  {activeOrders.map((order) => (
+                    <OrderTracker
+                      key={order.id}
+                      orderId={order.id}
+                      estimatedDeliveryTime={order.estimatedDeliveryTime || ""}
+                      currentStatus={order.currentStatus || "Processing"}
+                      steps={order.steps.map((step: any) => ({
+                        status: step.status,
+                        description: step.description,
+                        time: step.time || "",
+                        completed: step.completed,
+                        current: step.current,
+                      }))}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="max-w-3xl mx-auto p-8 text-center bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                  <div className="text-gray-500 dark:text-gray-400 mb-4">
+                    <svg className="w-16 h-16 mx-auto text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">No active orders</h3>
+                  <p className="mt-1 text-gray-500 dark:text-gray-400">You don't have any active orders at the moment.</p>
+                  <button
+                    onClick={() => setActiveTab('menu')}
+                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  >
+                    Browse Menu
+                  </button>
+                </div>
+              )}
             </>
           )}
 
           {activeTab === 'history' && (
             <>
               <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Order History</h1>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <OrderHistory
-                  orders={mockOrderHistory}
-                  onReorder={handleReorder}
-                />
-              </div>
+              {isLoading.orderHistory ? (
+                <div className="flex justify-center items-center h-48">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                  <OrderHistory
+                    orders={orderHistory}
+                    onReorder={handleReorder}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
