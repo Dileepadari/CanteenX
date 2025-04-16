@@ -1,47 +1,64 @@
-  version: '3.8'
+version: '3'
 
-  services:
-    frontend:
-      build: ./frontend
-      ports:
-        - "3000:3000"
-      volumes:
-        - ./frontend:/app           # hot reload support
-        - /app/node_modules         # prevent host node_modules from interfering
-      command: npm run dev
-      depends_on:
-        - backend
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin-pass
+      POSTGRES_DB: smartcanteen
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d smartcanteen"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-    backend:
-      build:
-        context: ./backend
-        dockerfile: Dockerfile
-      command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      volumes:
-        - ./backend/app:/app/app  # maps local code for hot reload
-      ports:
-        - "8000:8000"
-      environment:
-        - PYTHONPATH=/app
-      depends_on:
-        - db
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=smartcanteen
+      - DB_USER=admin
+      - DB_PASSWORD=admin-pass
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev
 
-    db:
-      image: postgres:13
-      environment:
-        POSTGRES_DB: smartcanteen
-        POSTGRES_USER: admin
-        POSTGRES_PASSWORD: password
-      ports:
-        - "5432:5432"
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
 
-    nginx:
-      image: nginx:latest
-      volumes:
-        - ./nginx.conf:/etc/nginx/nginx.conf
-      ports:
-        - "80:80"
-      depends_on:
-        - frontend
-        - backend
+networks:
+  default:
+    driver: bridge

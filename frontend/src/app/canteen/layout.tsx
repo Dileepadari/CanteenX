@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function AdminLayout({
+export default function CanteenLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -17,31 +17,31 @@ export default function AdminLayout({
         </div>
         <nav className="mt-4">
           <Link 
-            href="/admin/dashboard" 
+            href="/canteen/home" 
             className="block px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
-            Dashboard
+            Home
           </Link>
           <Link 
-            href="/admin/orders" 
+            href="/canteen/orders" 
             className="block px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             Orders
           </Link>
           <Link 
-            href="/admin/menu" 
+            href="/canteen/menu" 
             className="block px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             Menu Management
           </Link>
           <Link 
-            href="/admin/promotions" 
+            href="/canteen/promotions" 
             className="block px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             Promotions
           </Link>
           <Link 
-            href="/admin/bulk-orders" 
+            href="/canteen/bulk-orders" 
             className="block px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400"
           >
             Bulk Orders

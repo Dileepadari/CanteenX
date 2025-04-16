@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Smart Canteen Admin",
+  title: "Smart Canteen Vendor",
   description: "Smart Canteen Management System",
 };
 
