@@ -10,6 +10,7 @@ from app.models.canteen import Canteen
 from app.models.menu_item import MenuItem
 from app.models.user import User
 from app.models.cart import Cart, CartItem
+from app.models.order import Order, OrderItem, OrderStep
 
 def add_mock_users(db: Session):
     """Add mock users to the database"""
@@ -196,6 +197,243 @@ def add_mock_cart_data(db: Session):
     db.commit()
     print("✅ Mock cart data added to database")
 
+def add_mock_orders(db: Session):
+    """Add mock orders to the database"""
+    # Clear existing order data
+    db.query(OrderStep).delete()
+    db.query(OrderItem).delete()
+    db.query(Order).delete()
+    
+    # Active order for current date (April 17, 2025)
+    active_order = Order(
+        id="ORD12345",
+        user_id=1,
+        date=datetime.datetime.strptime("2025-04-16T12:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
+        total=450.00,
+        status="Processing",
+        canteen_name="Central Canteen",
+        vendor_name="Indian Delights",
+        estimated_delivery_time="12:45 PM",
+        current_status="Preparing"
+    )
+    db.add(active_order)
+    db.flush()
+    
+    # Order steps for active order
+    order_steps = [
+        OrderStep(
+            order_id=active_order.id,
+            status="Order Placed",
+            description="Your order has been received by the vendor.",
+            time="12:15 PM",
+            completed=1,
+            current=0
+        ),
+        OrderStep(
+            order_id=active_order.id,
+            status="Preparing",
+            description="The kitchen is preparing your food.",
+            time="12:20 PM",
+            completed=0,
+            current=1
+        ),
+        OrderStep(
+            order_id=active_order.id,
+            status="Ready for Pickup",
+            description="Your order is ready for pickup.",
+            time="",
+            completed=0,
+            current=0
+        ),
+        OrderStep(
+            order_id=active_order.id,
+            status="Completed",
+            description="Your order has been picked up.",
+            time="",
+            completed=0,
+            current=0
+        )
+    ]
+    for step in order_steps:
+        db.add(step)
+        
+    # Order items for active order
+    order_items = [
+        OrderItem(
+            order_id=active_order.id,
+            menu_item_id=1,
+            name="Butter Chicken",
+            price=220.00,
+            quantity=1,
+            customizations=json.dumps(["Extra Butter", "Medium Spicy"]),
+            vendor_name="Indian Delights"
+        ),
+        OrderItem(
+            order_id=active_order.id,
+            menu_item_id=2,
+            name="Garlic Naan",
+            price=40.00,
+            quantity=2,
+            customizations=json.dumps([]),
+            vendor_name="Indian Delights"
+        ),
+        OrderItem(
+            order_id=active_order.id,
+            menu_item_id=3,
+            name="Jeera Rice",
+            price=150.00,
+            quantity=1,
+            customizations=json.dumps(["Large Portion"]),
+            vendor_name="Indian Delights"
+        )
+    ]
+    for item in order_items:
+        db.add(item)
+    
+    # Order history
+    order_history = [
+        Order(
+            id="ORD12344",
+            user_id=1,
+            date=datetime.datetime.strptime("2025-04-12T15:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
+            total=320.00,
+            status="Completed",
+            canteen_name="Central Canteen",
+            vendor_name="Indian Delights"
+        ),
+        Order(
+            id="ORD12343",
+            user_id=1,
+            date=datetime.datetime.strptime("2025-04-10T13:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
+            total=280.00,
+            status="Completed",
+            canteen_name="South Campus Cafeteria",
+            vendor_name="Sandwich King"
+        ),
+        Order(
+            id="ORD12340",
+            user_id=1,
+            date=datetime.datetime.strptime("2025-04-05T19:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
+            total=520.00,
+            status="Cancelled",
+            canteen_name="North Block Canteen",
+            vendor_name="Chinese Corner"
+        )
+    ]
+    
+    # Add order history
+    for order in order_history:
+        db.add(order)
+    
+    # Add items for first history order
+    history_items1 = [
+        OrderItem(
+            order_id="ORD12344",
+            menu_item_id=1,
+            name="Paneer Butter Masala",
+            price=180.00,
+            quantity=1,
+            customizations=json.dumps(["Extra Spicy", "Regular Portion"]),
+            vendor_name="Indian Delights"
+        ),
+        OrderItem(
+            order_id="ORD12344",
+            menu_item_id=2,
+            name="Garlic Naan",
+            price=40.00,
+            quantity=2,
+            customizations=json.dumps([]),
+            vendor_name="Indian Delights"
+        ),
+        OrderItem(
+            order_id="ORD12344",
+            menu_item_id=3,
+            name="Sweet Lassi",
+            price=60.00,
+            quantity=1,
+            customizations=json.dumps([]),
+            vendor_name="Indian Delights"
+        )
+    ]
+    
+    # Add items for second history order
+    history_items2 = [
+        OrderItem(
+            order_id="ORD12343",
+            menu_item_id=4,
+            name="Grilled Chicken Club Sandwich",
+            price=150.00,
+            quantity=1,
+            customizations=json.dumps(["No Onions", "Extra Cheese"]),
+            vendor_name="Sandwich King"
+        ),
+        OrderItem(
+            order_id="ORD12343",
+            menu_item_id=5,
+            name="French Fries",
+            price=80.00,
+            quantity=1,
+            customizations=json.dumps(["Extra Salt"]),
+            vendor_name="Sandwich King"
+        ),
+        OrderItem(
+            order_id="ORD12343",
+            menu_item_id=3,
+            name="Chocolate Shake",
+            price=50.00,
+            quantity=1,
+            customizations=json.dumps([]),
+            vendor_name="Sandwich King"
+        )
+    ]
+    
+    # Add items for third history order
+    history_items3 = [
+        OrderItem(
+            order_id="ORD12340",
+            menu_item_id=1,
+            name="Hakka Noodles",
+            price=160.00,
+            quantity=1,
+            customizations=json.dumps(["Extra Veggies"]),
+            vendor_name="Chinese Corner"
+        ),
+        OrderItem(
+            order_id="ORD12340",
+            menu_item_id=2,
+            name="Chilli Paneer",
+            price=180.00,
+            quantity=1,
+            customizations=json.dumps(["Dry", "Extra Spicy"]),
+            vendor_name="Chinese Corner"
+        ),
+        OrderItem(
+            order_id="ORD12340",
+            menu_item_id=3,
+            name="Veg Spring Rolls",
+            price=120.00,
+            quantity=1,
+            customizations=json.dumps([]),
+            vendor_name="Chinese Corner"
+        ),
+        OrderItem(
+            order_id="ORD12340",
+            menu_item_id=4,
+            name="Fried Rice",
+            price=60.00,
+            quantity=1,
+            customizations=json.dumps(["No Eggs"]),
+            vendor_name="Chinese Corner"
+        )
+    ]
+    
+    # Add all history order items
+    for item in history_items1 + history_items2 + history_items3:
+        db.add(item)
+    
+    db.commit()
+    print("✅ Mock orders added to database")
+
 def initialize_mock_data():
     """Initialize database with mock data"""
     try:
@@ -209,6 +447,7 @@ def initialize_mock_data():
         add_mock_canteens(db)
         add_mock_menu_items(db)
         add_mock_cart_data(db)
+        add_mock_orders(db)
         
         print("✅ All mock data added successfully")
     except Exception as e:

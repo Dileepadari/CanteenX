@@ -16,7 +16,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "python -m app.mock_data && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend/app:/app/app  # maps local code for hot reload
     ports:
@@ -34,6 +34,8 @@ services:
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Add persistent storage
 
   nginx:
     image: nginx:latest
@@ -44,3 +46,6 @@ services:
     depends_on:
       - frontend
       - backend
+
+volumes:
+  postgres_data:  # Define the volume
