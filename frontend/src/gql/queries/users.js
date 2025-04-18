@@ -1,13 +1,9 @@
-// frontend/src/gql/queries/users.js
-export const AUTHENTICATE_USER_QUERY = `
-  mutation {
-  login(username: "admin", password: "yourpassword") {
-    message
-    user {
-      id
-      username
-      role
+export const CREATE_USER_QUERY = `
+    query {
+    signup(username: "testuser", email: "testuser.email", password: "password", role: "student") {
+      message
+      user
+      success
     }
   }
-}
 `

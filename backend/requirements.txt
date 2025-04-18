@@ -23,3 +23,5 @@ typing_extensions==4.12.2
 uvicorn==0.34.0
 python-jose==3.4.0
 passlib==1.7.4
+cryptography==3.4.8
+python-cas==1.6.0

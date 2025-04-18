@@ -29,7 +29,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @strawberry.type
-class Mutation:
+class AuthMutations:
     @strawberry.mutation
     async def login(self, info, username: str, password: str) -> LoginResponse:
         response: Response = info.context['response']
@@ -66,7 +66,6 @@ class Mutation:
             response.set_cookie(
                 key="accessToken",
                 value=access_token,
-                httponly=True,
                 secure=os.getenv("ENV") == "production",
                 max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
             )
@@ -74,7 +73,6 @@ class Mutation:
             response.set_cookie(
                 key="refreshToken",
                 value=refresh_token,
-                httponly=True,
                 secure=os.getenv("ENV") == "production",
                 max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
             )
@@ -99,3 +97,7 @@ class Mutation:
                     role="unknown"
                 )
             )
+        
+mutations = [
+    strawberry.field(name="login", resolver=AuthMutations.login)
+]
