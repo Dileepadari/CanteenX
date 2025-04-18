@@ -5,11 +5,13 @@ import MenuItemWithCustomization from "@/components/food/MenuItemWithCustomizati
 import { canteens, menuItems, categories as foodCategories } from "@/data/mockData";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MapPin, Clock, Star, Phone, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, SlidersHorizontal, Loader2 } from "lucide-react";
+import { Search, Filter, SlidersHorizontal, Loader2, ChevronLeft, Salad, Beef, Pizza, Coffee, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useNavigate } from "react-router-dom";
 
 const CanteenDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +24,7 @@ const CanteenDetails = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<string>("popularity");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
+  const navigate = useNavigate();
   useEffect(() => {
     let result = menuItems.filter((item) => Number(item.canteenId) === canteenId);
 
@@ -94,28 +96,153 @@ const CanteenDetails = () => {
       </MainLayout>
     );
   }
-
+  const getIconForTag = (tag: string) => {
+    switch(tag.toLowerCase()) {
+      case 'vegetarian':
+        return <Salad className="w-4 h-4 text-green-500" />;
+      case 'non-vegetarian':
+        return <Beef className="w-4 h-4 text-red-500" />;
+      case 'beverages':
+        return <Coffee className="w-4 h-4 text-brown-500" />;
+      case 'fast food':
+        return <Pizza className="w-4 h-4 text-yellow-500" />;
+      default:
+        return <Info className="w-4 h-4 text-gray-500" />;
+    }
+  }
   return (
     <MainLayout>
       {/* Hero Banner */}
-      <div className="relative h-64 md:h-80">
-        <img
-          src={canteen.image}
-          alt={canteen.name}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-          <div className="container mx-auto">
-            <div className="flex items-center space-x-2 mb-1">
-              <Badge variant={canteen.isOpen ? "success" : "destructive"}>
-                {canteen.isOpen ? "Open Now" : "Closed"}
-              </Badge>
-              <div className="flex items-center space-x-1">
-                <span className="font-medium">{canteen.rating}</span>
+      <div className="container px-4 py-8 mx-auto">
+        <Button 
+          onClick={() => navigate("/")} 
+          variant="ghost" 
+          className="mb-4 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" /> Back to Canteens
+        </Button>
+        
+        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-orange-100">
+          <div className="aspect-[3/1] overflow-hidden">
+            <img 
+              src={canteen.image} 
+              alt={canteen.name}
+              className="w-full h-full object-cover" 
+            />
+          </div>
+          
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+              <h1 className="text-3xl font-bold text-orange-600 mb-2 md:mb-0">{canteen.name}</h1>
+              <div className="flex items-center">
+                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500 mr-1" />
+                <span className="text-lg font-medium">{canteen.rating}</span>
+                <span className="text-sm text-gray-500 ml-1">({canteen?.ratingCount} ratings)</span>
               </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold">{canteen.name}</h1>
+            
+            <p className="text-gray-700 mb-6">{canteen.description}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-4">
+                <div className="flex items-start">
+                  <MapPin className="w-5 h-5 text-orange-500 mt-1 mr-2" />
+                  <div>
+                    <h4 className="font-medium">Location</h4>
+                    <p className="text-gray-600">{canteen.location}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start">
+                  <Clock className="w-5 h-5 text-orange-500 mt-1 mr-2" />
+                  <div>
+                    <h4 className="font-medium">Opening Hours</h4>
+                    <p className="text-gray-600">{canteen?.openTime} - {canteen?.closeTime}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start">
+                  <Phone className="w-5 h-5 text-orange-500 mt-1 mr-2" />
+                  <div>
+                    <h4 className="font-medium">Contact</h4>
+                    <p className="text-gray-600">{canteen.phone}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start">
+                  <Mail className="w-5 h-5 text-orange-500 mt-1 mr-2" />
+                  <div>
+                    <h4 className="font-medium">Email</h4>
+                    <p className="text-gray-600">{canteen?.email}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                <h3 className="font-medium mb-3">Meal Schedule</h3>
+                {canteen?.schedule?.breakfast && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Breakfast</span>
+                    <span className="text-gray-600">{canteen?.schedule?.breakfast}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.lunch && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Lunch</span>
+                    <span className="text-gray-600">{canteen?.schedule?.lunch}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.dinner && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Dinner</span>
+                    <span className="text-gray-600">{canteen?.schedule?.dinner}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.regular && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Regular Hours</span>
+                    <span className="text-gray-600">{canteen?.schedule?.regular}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.evening && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Evening</span>
+                    <span className="text-gray-600">{canteen?.schedule?.evening}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.night && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Night</span>
+                    <span className="text-gray-600">{canteen?.schedule?.night}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.weekday && (
+                  <div className="flex justify-between py-1 border-b border-orange-100">
+                    <span>Weekdays</span>
+                    <span className="text-gray-600">{canteen?.schedule?.weekday}</span>
+                  </div>
+                )}
+                {canteen?.schedule?.weekend && (
+                  <div className="flex justify-between py-1">
+                    <span>Weekends</span>
+                    <span className="text-gray-600">{canteen?.schedule?.weekend}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 mb-6">
+              {canteen?.tags.map((tag: string) => (
+                <Badge 
+                  key={tag} 
+                  variant="outline" 
+                  className="flex items-center gap-1 bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200"
+                >
+                  {getIconForTag(tag)}
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
       </div>

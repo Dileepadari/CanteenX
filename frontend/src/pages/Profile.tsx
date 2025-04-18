@@ -80,7 +80,9 @@ const Profile = () => {
       title: "Logged out successfully",
       description: "You have been logged out of your account.",
     });
-    navigate("/login");
+
+    setUserData(null);
+    navigate("/logout");
   };
 
   return (

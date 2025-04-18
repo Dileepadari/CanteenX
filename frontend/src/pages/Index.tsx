@@ -12,6 +12,7 @@ import MenuItemWithCustomization from "@/components/food/MenuItemWithCustomizati
 
 
 const Index = () => {
+  
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const { toast } = useToast();
 
@@ -82,7 +83,7 @@ const Index = () => {
         </div>
 
         {/* How It Works */}
-        <div className="bg-gray-50 rounded-xl p-8 mb-12">
+        <div className="bg-gray-50 rounded-xl p-8 mb-12" id="how-it-works">
           <h2 className="text-2xl font-bold mb-6 text-center">How Smart Canteen Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
