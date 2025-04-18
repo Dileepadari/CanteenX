@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUserStore } from "@/stores/userStore";
 import { ArrowRight, Loader2 } from "lucide-react";
+import { LOGIN_MUTATION } from "@/gql/mutations/user";
+import { useMutation } from "@apollo/client";
 
 const simulateCASAuthentication = (email: string, password: string) => {
   return new Promise<{ success: boolean; user?: any; error?: string }>((resolve) => {
@@ -60,43 +61,47 @@ const Login = () => {
 
   
 
-  const handleLogin = async(e: React.FormEvent) => {
+  const [loginMutation] = useMutation(LOGIN_MUTATION);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setIsLoading(true);
-    
+
     try {
-      const response = await simulateCASAuthentication(email, password);
-      
-      if (response.success && response.user) {
-        login(response.user);
-        
+      const { data } = await loginMutation({
+        variables: {
+          username: email,
+          password,
+        },
+      });
+
+      if (data?.login?.message === "Invalid credentials") {
         toast({
-          title: "Login successful",
-          description: `Welcome back, ${response.user.name}!`,
+          title: "Login Failed",
+          description: data.login.error,
+          variant: "destructive",
         });
-        
-        // Redirect to previous page or home
-        navigate(-1);
+        return;
+      }
+      if (data?.login?.user) {
+        console.log("Login successful:", data.login.user);
+        localStorage.setItem("authToken", data.login.user.id); // Example: Save user ID as token
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${data.login.user.username}!`,
+        });
+        navigate("/"); // Redirect to dashboard or another page
       } else {
         toast({
-          title: "Authentication failed",
-          description: response.error || "Invalid credentials",
+          title: "Login Failed",
+          description: data?.login?.message || "Invalid credentials",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
