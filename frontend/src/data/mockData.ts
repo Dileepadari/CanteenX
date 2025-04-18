@@ -8,23 +8,48 @@ export const canteens = [
     image: "/placeholder.svg",
     location: "Near Academic Block",
     rating: 4.5,
+    ratingCount: 120, // Added rating count
     openTime: "08:00",
     closeTime: "22:00",
     isOpen: true,
     description: "Multi-cuisine restaurant offering a variety of dishes from across India.",
-    phone: "040-23456789"
+    phone: "040-23456789",
+    email: "himalaya@canteen.com", // Added email
+    schedule: {
+      breakfast: "08:00 AM - 10:00 AM",
+      lunch: "12:00 PM - 02:00 PM",
+      dinner: "07:00 PM - 09:00 PM",
+      regular: "08:00 AM - 10:00 PM",
+      evening: "04:00 PM - 06:00 PM",
+      night: "10:00 PM - 12:00 AM",
+      weekday: "08:00 AM - 10:00 PM",
+      weekend: "08:00 AM - 11:00 PM",
+    },
+    tags: ["Vegetarian", "Fast Food", "Beverages"], // Added tags
   },
   {
     id: 2,
-    name: "Vindhya Canteen",
+    name: "Central Canteen",
     image: "/placeholder.svg",
-    location: "Vindhya Building Ground Floor",
+    location: "Main Campus",
     rating: 4.2,
-    openTime: "09:00",
-    closeTime: "21:00",
+    openTime: "07:00",
+    closeTime: "22:00",
     isOpen: true,
-    description: "Fast food and quick bites for students on the go.",
-    phone: "040-23456788"
+    description: "Centralized dining area with a variety of food options.",
+    phone: "040-23456788",
+    email: "central@canteen.com", // Added email
+    schedule: {
+      breakfast: "07:00 AM - 09:00 AM",
+      lunch: "12:00 PM - 02:00 PM",
+      dinner: "07:00 PM - 09:00 PM",
+      regular: "07:00 AM - 10:00 PM",
+      evening: "04:00 PM - 06:00 PM",
+      night: "10:00 PM - 12:00 AM",
+      weekday: "07:00 AM - 10:00 PM",
+      weekend: "07:00 AM - 11:00 PM",
+    },
+    tags: ["Non-Vegetarian", "Vegetarian", "Snacks"], // Added tags
   },
   {
     id: 3,
@@ -36,7 +61,19 @@ export const canteens = [
     closeTime: "20:30",
     isOpen: true,
     description: "Premium dining experience with table service and gourmet options.",
-    phone: "040-23456787"
+    phone: "040-23456787",
+    email: "faculty@canteen.com", // Added email
+    schedule: {
+      breakfast: "08:30 AM - 10:00 AM",
+      lunch: "12:00 PM - 02:00 PM",
+      dinner: "07:00 PM - 08:30 PM",
+      regular: "08:30 AM - 08:30 PM",
+      evening: "04:00 PM - 06:00 PM",
+      night: null,
+      weekday: "08:30 AM - 08:30 PM",
+      weekend: "09:00 AM - 08:30 PM",
+    }, // Added schedule
+    tags: ["Gourmet", "Table Service"], // Added tags
   },
   {
     id: 4,
@@ -48,7 +85,19 @@ export const canteens = [
     closeTime: "21:00",
     isOpen: false,
     description: "Budget-friendly meals with a focus on South Indian cuisine.",
-    phone: "040-23456786"
+    phone: "040-23456786",
+    email: "southcampus@canteen.com", // Added email
+    schedule: {
+      breakfast: "08:00 AM - 10:00 AM",
+      lunch: "12:00 PM - 02:00 PM",
+      dinner: "07:00 PM - 09:00 PM",
+      regular: "08:00 AM - 09:00 PM",
+      evening: "04:00 PM - 06:00 PM",
+      night: null,
+      weekday: "08:00 AM - 09:00 PM",
+      weekend: "08:00 AM - 10:00 PM",
+    }, // Added schedule
+    tags: ["South Indian", "Budget-Friendly"], // Added tags
   },
   {
     id: 5,
@@ -60,7 +109,19 @@ export const canteens = [
     closeTime: "03:00",
     isOpen: true,
     description: "Late night food options for hostel students. Popular for midnight snacks.",
-    phone: "040-23456785"
+    phone: "040-23456785",
+    email: "nightcanteen@canteen.com", // Added email
+    schedule: {
+      breakfast: null,
+      lunch: null,
+      dinner: "07:00 PM - 09:00 PM",
+      regular: "06:00 PM - 03:00 AM",
+      evening: "06:00 PM - 08:00 PM",
+      night: "10:00 PM - 03:00 AM",
+      weekday: "06:00 PM - 03:00 AM",
+      weekend: "06:00 PM - 03:00 AM",
+    }, // Added schedule
+    tags: ["Late Night", "Snacks"], // Added tags
   }
 ];
 

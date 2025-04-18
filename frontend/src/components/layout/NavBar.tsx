@@ -97,8 +97,8 @@ const NavBar = () => {
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 cursor-pointer">
-                <LogOut className="h-4 w-4 mr-2" /> Logout
+              <DropdownMenuItem className="text-red-600 cursor-pointer" >
+                <LogOut className="h-4 w-4 mr-2" /> <Link to="/logout">LogOut</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -24,6 +24,7 @@ import VendorPromotions from "./pages/vendor/VendorPromotions";
 import VendorAnalytics from "./pages/vendor/VendorAnalytics";
 import VendorSettings from "./pages/vendor/VendorSettings";
 import VendorBulkOrders from "./pages/vendor/VendorBulkOrders";
+import LogOut from "./pages/LogOut";
 
 import { GqlProvider } from "./gql/client";
 import useAuthMiddleware from "./middleware";
@@ -58,6 +59,7 @@ const App = () => (
                     <Route path="/feedback" element={<Feedback />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/profile" element={<Profile />} />
+                    <Route path="/logout" element={<LogOut />} />
                     
                     {/* Vendor Pages */}
                     <Route path="/vendor/dashboard" element={<VendorDashboard />} />
