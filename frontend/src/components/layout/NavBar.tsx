@@ -15,7 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import NavLinks from "./NavLinks";
 import { useCart } from "@/contexts/CartContext";
-import { ShoppingCart, Menu, LogOut, User } from "lucide-react";
+import { Menu, LogOut, User } from "lucide-react";
+import { ShoppingCart } from "@/components/cart/ShoppingCart";
 import { useNotification } from "@/contexts/NotificationContext";
 import UserNotifications from "../notification/UserNotifications";
 import VendorNotifications from "../notification/VendorNotifications";
@@ -33,15 +34,12 @@ const NavBar = () => {
     <header className="sticky top-0 z-50 w-full backdrop-blur-sm bg-white/90 border-b">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2">
-          <img src="/placeholder.svg" alt="Logo" className="w-8 h-8" />
-          <span className="text-lg font-semibold">Smart Canteen</span>
-          {isVendorRoute && (
-            <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-800 border-orange-300">
-              Vendor
-            </Badge>
-          )}
-        </Link>
+        <div className="flex items-center">
+            <Link to="/" className="flex items-center space-x-2">
+              <span className="text-2xl font-bold text-canteen-orange">Smart</span>
+              <span className="text-2xl font-bold text-canteen-blue">Canteen</span>
+            </Link>
+          </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex md:items-center md:space-x-4 lg:space-x-6">
@@ -57,7 +55,7 @@ const NavBar = () => {
           {!isVendorRoute && (
             <Link to="/menu">
               <Button variant="outline" size="icon" className="relative">
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart  />
                 {items.length > 0 && (
                   <Badge 
                     className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center p-0 bg-orange-500"
