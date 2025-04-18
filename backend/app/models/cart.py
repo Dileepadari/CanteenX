@@ -12,8 +12,8 @@ class Cart(Base):
     canteenId = Column(Integer, ForeignKey("canteens.id"))
     createdAt = Column(String)
     updatedAt = Column(String)
-    pickup_date = Column(DateTime, nullable=True)
-    pickup_time = Column(String, nullable=True) 
+    pickupDate = Column(DateTime, nullable=True)
+    pickupTime = Column(String, nullable=True) 
     # Relationships
     user = relationship("User", backref="cart")
     canteen = relationship("Canteen")
@@ -21,10 +21,10 @@ class Cart(Base):
 class CartItem(Base):
     __tablename__ = "cart_items"
     id = Column(Integer, primary_key=True, index=True)
-    cart_id = Column(Integer, ForeignKey("carts.id"))
-    menu_item_id = Column(Integer, ForeignKey("menu_items.id"))
+    cartId = Column(Integer, ForeignKey("carts.id"))
+    menuItemId = Column(Integer, ForeignKey("menu_items.id"))
     quantity = Column(Integer, default=1)
-    selected_size = Column(JSON, nullable=True)
-    selected_extras = Column(JSON, nullable=True)
-    special_instructions = Column(String, nullable=True)
+    selectedSize = Column(JSON, nullable=True)
+    selectedExtras = Column(JSON, nullable=True)
+    specialInstructions = Column(String, nullable=True)
     location = Column(String, nullable=True)  # e.g., "Faculty Lounge", "Main Mess"

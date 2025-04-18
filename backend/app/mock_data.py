@@ -10,6 +10,8 @@ from app.models.canteen import Canteen
 from app.models.menu_item import MenuItem
 from app.models.user import User
 from app.models.order import Order
+from app.models.cart import Cart, CartItem
+from app.models.complaints import Complaint
 
 def add_mock_users(db: Session):
     """Add mock users to the database"""
@@ -317,6 +319,73 @@ def add_mock_orders(db: Session):
     db.commit()
     print("✅ Mock orders added to database")
 
+def add_mock_carts(db: Session):
+    """Add mock carts to the database"""
+    now = datetime.datetime.now().isoformat()
+    
+    carts = [
+        Cart(
+            id=1,
+            userId=1,
+            items=[],
+            totalAmount=0,
+            canteenId=1,
+            createdAt=now,
+            updatedAt=now,
+            pickupDate=None,
+            pickupTime=None
+        )
+    ]
+    
+    for cart in carts:
+        db_cart = db.query(Cart).filter(Cart.id == cart.id).first()
+        if not db_cart:
+            db.add(cart)
+    
+    db.commit()
+    print("✅ Mock carts added to database")
+
+def add_mock_complaints(db: Session):
+    """Add mock complaints to the database"""
+    now = datetime.datetime.now().isoformat()
+    
+    complaints = [
+        Complaint(
+            id=1,
+            userId=1,
+            orderId=1001,
+            complaintText="The food was delivered cold and some items were missing from my order.",
+            heading="Cold Food and Missing Items",
+            complaintType="food_quality",
+            status="pending",
+            isEscalated=False,
+            responseText=None,
+            createdAt=now,
+            updatedAt=now
+        ),
+        Complaint(
+            id=2,
+            userId=1,
+            orderId=1002,
+            complaintText="I was charged for extra items that I didn't order.",
+            heading="Incorrect Billing",
+            complaintType="billing_issue",
+            status="pending",
+            isEscalated=False,
+            responseText=None,
+            createdAt=now,
+            updatedAt=now
+        )
+    ]
+    
+    for complaint in complaints:
+        db_complaint = db.query(Complaint).filter(Complaint.id == complaint.id).first()
+        if not db_complaint:
+            db.add(complaint)
+    
+    db.commit()
+    print("✅ Mock complaints added to database")
+
 def initialize_mock_data():
     """Initialize database with mock data"""
     try:
@@ -330,6 +399,8 @@ def initialize_mock_data():
         add_mock_canteens(db)
         add_mock_menu_items(db)
         add_mock_orders(db)
+        add_mock_carts(db)
+        add_mock_complaints(db)
         
         print("✅ All mock data added successfully")
     except Exception as e:

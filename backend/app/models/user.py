@@ -20,5 +20,4 @@ class User(Base):
     canteens = relationship("Canteen", back_populates="user")
     
     # For authentication
-    hashed_password = Column(String, nullable=True)  # Made nullable for mock data
     isActive = Column(Boolean, default=True)

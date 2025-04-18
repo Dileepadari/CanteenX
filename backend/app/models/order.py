@@ -15,7 +15,7 @@ class OrderItem(Base):
     
     # # Relationships
     # order = relationship("Order", back_populates="items")
-    # menu_item = relationship("MenuItem", back_populates="order_items")
+    # menuItem = relationship("MenuItem", back_populates="orderItems")
 
 class Order(Base):
     __tablename__ = "orders"

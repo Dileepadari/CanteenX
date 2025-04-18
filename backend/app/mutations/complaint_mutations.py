@@ -18,30 +18,30 @@ class ComplaintMutation:
     @strawberry.mutation
     def create_complaint(
         self,
-        user_id: int,
-        order_id: int,
-        complaint_text: str,
+        userId: int,
+        orderId: int,
+        complaintText: str,
         heading: str,
-        complaint_type: str,
+        complaintType: str,
         status: str = "pending",
-        is_escalated: bool = False,
-        response_text: Optional[str] = None,
+        isEscalated: bool = False,
+        responseText: Optional[str] = None,
     ) -> ComplaintMutationResponse:
         db: Session = next(get_db())
         
         now = datetime.now(timezone.utc)
         
         new_complaint = Complaint(
-            user_id=user_id,
-            order_id=order_id,
-            complaint_text=complaint_text,
+            userId=userId,
+            orderId=orderId,
+            complaintText=complaintText,
             heading=heading,
-            complaint_type=complaint_type,
+            complaintType=complaintType,
             status=status,
-            is_escalated=is_escalated,
-            response_text=response_text,
-            created_at=now.isoformat(),
-            updated_at=now.isoformat()
+            isEscalated=isEscalated,
+            responseText=responseText,
+            createdAt=now.isoformat(),
+            updatedAt=now.isoformat()
         )
         
         db.add(new_complaint)
@@ -53,36 +53,36 @@ class ComplaintMutation:
     @strawberry.mutation
     def update_complaint(
         self,
-        complaint_id: int,
-        complaint_text: Optional[str] = None,
+        complaintId: int,
+        complaintText: Optional[str] = None,
         heading: Optional[str] = None,
-        complaint_type: Optional[str] = None,
+        complaintType: Optional[str] = None,
         status: Optional[str] = None,
-        is_escalated: Optional[bool] = None,
-        response_text: Optional[str] = None,
+        isEscalated: Optional[bool] = None,
+        responseText: Optional[str] = None,
     ) -> ComplaintMutationResponse:
         db: Session = next(get_db())
         
-        complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+        complaint = db.query(Complaint).filter(Complaint.id == complaintId).first()
         
         if not complaint:
             return ComplaintMutationResponse(success=False, message="Complaint not found.")
         
-        if complaint_text:
-            complaint.complaint_text = complaint_text
+        if complaintText:
+            complaint.complaintText = complaintText
         if heading:
             complaint.heading = heading
-        if complaint_type:
-            complaint.complaint_type = complaint_type
+        if complaintType:
+            complaint.complaintType = complaintType
         if status:
             complaint.status = status
-        if is_escalated is not None:
-            complaint.is_escalated = is_escalated
-        if response_text:
-            complaint.response_text = response_text
+        if isEscalated is not None:
+            complaint.isEscalated = isEscalated
+        if responseText:
+            complaint.responseText = responseText
         
         now = datetime.now(timezone.utc)
-        complaint.updated_at = now.isoformat()
+        complaint.updatedAt = now.isoformat()
         
         db.commit()
         
@@ -91,11 +91,11 @@ class ComplaintMutation:
     @strawberry.mutation
     def close_complaint(
         self,
-        complaint_id: int,
+        complaintId: int,
     ) -> ComplaintMutationResponse:
         db: Session = next(get_db())
         
-        complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+        complaint = db.query(Complaint).filter(Complaint.id == complaintId).first()
         
         if not complaint:
             return ComplaintMutationResponse(success=False, message="Complaint not found.")
@@ -103,7 +103,7 @@ class ComplaintMutation:
         complaint.status = "resolved"
         
         now = datetime.now(timezone.utc)
-        complaint.updated_at = now.isoformat()
+        complaint.updatedAt = now.isoformat()
         
         db.commit()
         
@@ -112,19 +112,19 @@ class ComplaintMutation:
     @strawberry.mutation
     def escalate_complaint(
         self,
-        complaint_id: int,
+        complaintId: int,
     ) -> ComplaintMutationResponse:
         db: Session = next(get_db())
         
-        complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+        complaint = db.query(Complaint).filter(Complaint.id == complaintId).first()
         
         if not complaint:
             return ComplaintMutationResponse(success=False, message="Complaint not found.")
         
-        complaint.is_escalated = True
+        complaint.isEscalated = True
         
         now = datetime.now(timezone.utc)
-        complaint.updated_at = now.isoformat()
+        complaint.updatedAt = now.isoformat()
         
         db.commit()
         

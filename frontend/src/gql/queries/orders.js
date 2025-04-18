@@ -24,7 +24,6 @@ export const GET_USER_ORDERS = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations
@@ -39,7 +38,7 @@ export const GET_USER_ORDERS = `
  */
 export const GET_ALL_ORDERS = `
   query GetAllOrders($userId: Int!) {
-    getAllOrders(user_id: $userId) {
+    getAllOrders(userId: $userId) {
       id
       userId
       canteenId
@@ -60,7 +59,6 @@ export const GET_ALL_ORDERS = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations
@@ -75,7 +73,7 @@ export const GET_ALL_ORDERS = `
  */
 export const GET_ACTIVE_ORDERS = `
   query GetActiveOrders($userId: Int!) {
-    getActiveOrders(user_id: $userId) {
+    getActiveOrders(userId: $userId) {
       id
       userId
       canteenId
@@ -96,7 +94,6 @@ export const GET_ACTIVE_ORDERS = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations
@@ -132,7 +129,6 @@ export const GET_CANTEEN_ORDERS = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations
@@ -168,7 +164,6 @@ export const GET_ORDER_BY_ID = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations
@@ -204,7 +199,6 @@ export const GET_ORDERS_BY_STATUS = `
       phone
       isPreOrder
       items {
-        id
         itemId
         quantity
         customizations

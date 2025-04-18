@@ -1,8 +1,10 @@
-/*
+/**
+ * GraphQL mutations related to shopping cart
+ */
 
-Mutation to add a menu item to the user's cart
-
-*/
+/**
+ * Mutation to add a menu item to the user's cart
+ */
 export const ADD_TO_CART = `
 mutation AddToCart(
   $userId: Int!,
@@ -26,13 +28,11 @@ mutation AddToCart(
     message
   }
 }
-`
+`;
 
-/*
-
-Mutation to update a cart item's details (quantity, size, extras, etc.)
-
-*/
+/**
+ * Mutation to update a cart item's details (quantity, size, extras, etc.)
+ */
 export const UPDATE_CART_ITEM = `
 mutation UpdateCartItem(
   $cartItemId: Int!,
@@ -54,13 +54,11 @@ mutation UpdateCartItem(
     message
   }
 }
-`
+`;
 
-/*
-
-Mutation to remove an item from the cart
-
-*/
+/**
+ * Mutation to remove an item from the cart
+ */
 export const REMOVE_FROM_CART = `
 mutation RemoveFromCart(
   $userId: Int!,
@@ -74,18 +72,18 @@ mutation RemoveFromCart(
     message
   }
 }
-`
+`;
 
-/*
-
-Mutation to clear the user's entire cart
-
-*/
+/**
+ * Mutation to clear the user's entire cart
+ */
 export const CLEAR_CART = `
 mutation ClearCart($userId: Int!) {
-  clearCart(userId: $userId) {
+  clearCart(
+    userId: $userId
+  ) {
     success
     message
   }
 }
-`
+`;

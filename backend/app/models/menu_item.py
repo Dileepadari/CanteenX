@@ -22,6 +22,6 @@ class MenuItem(Base):
     customizationOptions = Column(JSON)  # Store as JSON object
     
     # Relationships
-    canteen = relationship("Canteen", back_populates="menu_items")
-    # Removed order_items relationship since we're using JSON for order items
+    canteen = relationship("Canteen", back_populates="menuItems")
+    # Removed orderItems relationship since we're using JSON for order items
 

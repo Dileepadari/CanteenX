@@ -18,6 +18,6 @@ class Canteen(Base):
     userId = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # Relationships
-    menu_items = relationship("MenuItem", back_populates="canteen")
+    menuItems = relationship("MenuItem", back_populates="canteen")
     orders = relationship("Order", back_populates="canteen")
     user = relationship("User", back_populates="canteens")

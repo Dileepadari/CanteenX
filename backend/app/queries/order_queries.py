@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.models.order import OrderItem, Order
 from app.core.database import get_db
 from sqlalchemy import desc, func
+from datetime import datetime
 
 @strawberry.type
 class OrderItemType:
@@ -18,115 +19,113 @@ class OrderType:
     id: int
     userId: int
     canteenId: int
+    items: List[OrderItemType]  # List of OrderItemType objects
     totalAmount: float
     status: str
     orderTime: str
-    confirmedTime: Optional[str]
-    preparingTime: Optional[str]
-    readyTime: Optional[str]
-    deliveryTime: Optional[str]
-    cancelledTime: Optional[str]
-    pickupTime: Optional[str]
+    confirmedTime: Optional[str] = None
+    preparingTime: Optional[str] = None
+    readyTime: Optional[str] = None
+    deliveryTime: Optional[str] = None
     paymentMethod: str
     paymentStatus: str
-    customerNote: Optional[str]
-    cancellationReason: Optional[str]
+    customerNote: Optional[str] = None
     discount: float
     phone: str
+    pickupTime: Optional[str] = None
     isPreOrder: bool
-    items: List[OrderItemType]
+    cancelledTime: Optional[str] = None
+    cancellationReason: Optional[str] = None
 
-    @staticmethod
-    def from_db_model(order: "Order") -> "OrderType":
-        return OrderType(
-            id=order.id,
-            userId=order.userId,
-            canteenId=order.canteenId,
-            totalAmount=order.totalAmount,
-            status=order.status,
-            orderTime=order.orderTime,
-            confirmedTime=order.confirmedTime,
-            preparingTime=order.preparingTime,
-            readyTime=order.readyTime,
-            deliveryTime=order.deliveryTime,
-            cancelledTime=order.cancelledTime,
-            pickupTime=order.pickupTime,
-            paymentMethod=order.paymentMethod,
-            paymentStatus=order.paymentStatus,
-            customerNote=order.customerNote,
-            cancellationReason=order.cancellationReason,
-            discount=order.discount,
-            phone=order.phone,
-            isPreOrder=order.isPreOrder,
-            items=[
-                OrderItemType(
-                    id=item.get("id"),
-                    itemId=item["itemId"],
-                    quantity=item["quantity"],
-                    customizations=item.get("customizations"),
-                    note=item.get("note")
-                )
-                for item in order.items
-            ]
-        )
+def map_order_to_type(order: Order) -> OrderType:
+    """Map database Order model to GraphQL OrderType"""
+    # Parse items from JSON to OrderItemType objects
+    order_items = []
+    if order.items:
+        for item_data in order.items:
+            item = OrderItemType(
+                itemId=item_data.get('itemId'),
+                quantity=item_data.get('quantity', 1),
+                customizations=item_data.get('customizations'),
+                note=item_data.get('note')
+            )
+            order_items.append(item)
+    
+    return OrderType(
+        id=order.id,
+        userId=order.userId,
+        canteenId=order.canteenId,
+        items=order_items,
+        totalAmount=order.totalAmount,
+        status=order.status,
+        orderTime=order.orderTime,
+        confirmedTime=order.confirmedTime,
+        preparingTime=order.preparingTime,
+        readyTime=order.readyTime,
+        deliveryTime=order.deliveryTime,
+        paymentMethod=order.paymentMethod,
+        paymentStatus=order.paymentStatus,
+        customerNote=order.customerNote,
+        discount=order.discount,
+        phone=order.phone,
+        pickupTime=order.pickupTime,
+        isPreOrder=order.isPreOrder,
+        cancelledTime=order.cancelledTime,
+        cancellationReason=order.cancellationReason,
+    )
 
-@strawberry.type
-class OrderQuery:
-    @strawberry.field
-    def get_user_orders(self, userId: int) -> List[OrderType]:
-        """Get all orders for a user"""
-        db = next(get_db())
-        orders = db.query(Order).filter(Order.userId == userId).all()
-        return [OrderType.from_db_model(order) for order in orders]
+def resolve_get_all_orders(userId: int) -> List[OrderType]:
+    """Get all orders for a user"""
+    db = next(get_db())
+    orders = db.query(Order).filter(Order.userId == userId).order_by(desc(Order.orderTime)).all()
+    return [map_order_to_type(order) for order in orders]
 
-    @strawberry.field
-    def get_canteen_orders(self, canteenId: int) -> List[OrderType]:
-        """Get all orders for a canteen"""
-        db = next(get_db())
-        orders = db.query(Order).filter(Order.canteenId == canteenId).all()
-        return [OrderType.from_db_model(order) for order in orders]
+def resolve_get_active_orders(userId: int) -> List[OrderType]:
+    """Get active orders (not delivered or cancelled) for a user"""
+    db = next(get_db())
+    orders = db.query(Order)\
+        .filter(Order.userId == userId)\
+        .filter(Order.status.in_(["pending", "confirmed", "preparing", "ready"]))\
+        .order_by(desc(Order.orderTime))\
+        .all()
+    return [map_order_to_type(order) for order in orders]
 
-    @strawberry.field
-    def get_order_by_id(self, orderId: int) -> Optional[OrderType]:
-        """Get a specific order by ID"""
-        db = next(get_db())
-        order = db.query(Order).filter(Order.id == orderId).first()
-        return OrderType.from_db_model(order) if order else None
+def resolve_get_order_by_id(orderId: int) -> Optional[OrderType]:
+    """Get specific order by ID"""
+    db = next(get_db())
+    order = db.query(Order).filter(Order.id == orderId).first()
+    if not order:
+        return None
+    return map_order_to_type(order)
 
-    @strawberry.field
-    def get_orders_by_status(self, status: str) -> List[OrderType]:
-        """Get all orders with a specific status"""
-        db = next(get_db())
-        orders = db.query(Order).filter(Order.status == status.lower()).all()
-        return [OrderType.from_db_model(order) for order in orders]
+def resolve_get_canteen_orders(canteenId: int) -> List[OrderType]:
+    """Get all orders for a specific canteen"""
+    db = next(get_db())
+    orders = db.query(Order).filter(Order.canteenId == canteenId).order_by(desc(Order.orderTime)).all()
+    return [map_order_to_type(order) for order in orders]
 
-    @strawberry.field
-    def get_all_orders(self, user_id: int) -> List[OrderType]:
-        """Get all orders for a specific user"""
-        db = next(get_db())
-        orders = db.query(Order).filter(Order.userId == user_id).order_by(desc(Order.orderTime)).all()
-        return [OrderType.from_db_model(order) for order in orders]
+def resolve_get_canteen_active_orders(canteenId: int) -> List[OrderType]:
+    """Get active orders for a specific canteen"""
+    db = next(get_db())
+    orders = db.query(Order)\
+        .filter(Order.canteenId == canteenId)\
+        .filter(Order.status.in_(["pending", "confirmed", "preparing", "ready"]))\
+        .order_by(desc(Order.orderTime))\
+        .all()
+    return [map_order_to_type(order) for order in orders]
 
-    @strawberry.field
-    def get_active_orders(self, user_id: int) -> List[OrderType]:
-        """Get all active orders for a specific user"""
-        db = next(get_db())
-        inactive_statuses = ['completed', 'cancelled', 'rejected']
-        
-        orders = db.query(Order)\
-            .filter(Order.userId == user_id)\
-            .filter(func.lower(Order.status).notin_([status.lower() for status in inactive_statuses]))\
-            .order_by(desc(Order.orderTime))\
-            .all()
-            
-        return [OrderType.from_db_model(order) for order in orders]
+# Create properly decorated fields with resolvers
+getAllOrders = strawberry.field(name="getAllOrders", resolver=resolve_get_all_orders)
+getActiveOrders = strawberry.field(name="getActiveOrders", resolver=resolve_get_active_orders)
+getOrderById = strawberry.field(name="getOrderById", resolver=resolve_get_order_by_id)
+getCanteenOrders = strawberry.field(name="getCanteenOrders", resolver=resolve_get_canteen_orders)
+getCanteenActiveOrders = strawberry.field(name="getCanteenActiveOrders", resolver=resolve_get_canteen_active_orders)
 
-# Export the query fields
+# Export the queries
 queries = [
-    strawberry.field(name="getUserOrders", resolver=OrderQuery.get_user_orders),
-    strawberry.field(name="getCanteenOrders", resolver=OrderQuery.get_canteen_orders),
-    strawberry.field(name="getOrderById", resolver=OrderQuery.get_order_by_id),
-    strawberry.field(name="getOrdersByStatus", resolver=OrderQuery.get_orders_by_status),
-    strawberry.field(name="getAllOrders", resolver=OrderQuery.get_all_orders),
-    strawberry.field(name="getActiveOrders", resolver=OrderQuery.get_active_orders),
+    getAllOrders,
+    getActiveOrders,
+    getOrderById,
+    getCanteenOrders,
+    getCanteenActiveOrders
 ]

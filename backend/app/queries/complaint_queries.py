@@ -12,82 +12,83 @@ def resolve_get_all_complaints() -> List[ComplaintType]:
     
     return [ComplaintType(
         id=complaint.id,
-        user_id=complaint.user_id,
-        order_id=complaint.order_id,
-        complaint_text=complaint.complaint_text,
+        userId=complaint.userId,
+        orderId=complaint.orderId,
+        complaintText=complaint.complaintText,
         heading=complaint.heading,
-        complaint_type=complaint.complaint_type,
+        complaintType=complaint.complaintType,
         status=complaint.status,
-        is_escalated=complaint.is_escalated,
-        response_text=complaint.response_text,
-        created_at=complaint.created_at,
-        updated_at=complaint.updated_at
+        isEscalated=complaint.isEscalated,
+        responseText=complaint.responseText,
+        createdAt=complaint.createdAt,
+        updatedAt=complaint.updatedAt
     ) for complaint in complaints]
 
 
-def resolve_get_complaint_by_id(complaint_id: int) -> Optional[ComplaintType]:
+def resolve_get_complaint_by_id(complaintId: int) -> Optional[ComplaintType]:
     # Get database session
     db = next(get_db())
     
     # Query for the specific complaint
-    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    complaint = db.query(Complaint).filter(Complaint.id == complaintId).first()
     
     if not complaint:
         return None
 
     return ComplaintType(
         id=complaint.id,
-        user_id=complaint.user_id,
-        order_id=complaint.order_id,
-        complaint_text=complaint.complaint_text,
+        userId=complaint.userId,
+        orderId=complaint.orderId,
+        complaintText=complaint.complaintText,
         heading=complaint.heading,
-        complaint_type=complaint.complaint_type,
+        complaintType=complaint.complaintType,
         status=complaint.status,
-        is_escalated=complaint.is_escalated,
-        response_text=complaint.response_text,
-        created_at=complaint.created_at,
-        updated_at=complaint.updated_at
+        isEscalated=complaint.isEscalated,
+        responseText=complaint.responseText,
+        createdAt=complaint.createdAt,
+        updatedAt=complaint.updatedAt
     )
-def resolve_get_complaints_by_user_id(user_id: int) -> List[ComplaintType]:
+
+def resolve_get_complaints_by_user_id(userId: int) -> List[ComplaintType]:
     # Get database session
     db = next(get_db())
     
     # Query for the specific user
-    complaints = db.query(Complaint).filter(Complaint.user_id == user_id).all()
+    complaints = db.query(Complaint).filter(Complaint.userId == userId).all()
     
     return [ComplaintType(
         id=complaint.id,
-        user_id=complaint.user_id,
-        order_id=complaint.order_id,
-        complaint_text=complaint.complaint_text,
+        userId=complaint.userId,
+        orderId=complaint.orderId,
+        complaintText=complaint.complaintText,
         heading=complaint.heading,
-        complaint_type=complaint.complaint_type,
+        complaintType=complaint.complaintType,
         status=complaint.status,
-        is_escalated=complaint.is_escalated,
-        response_text=complaint.response_text,
-        created_at=complaint.created_at,
-        updated_at=complaint.updated_at
+        isEscalated=complaint.isEscalated,
+        responseText=complaint.responseText,
+        createdAt=complaint.createdAt,
+        updatedAt=complaint.updatedAt
     ) for complaint in complaints]
     
-def resolve_get_complaints_by_order_id(order_id: int) -> List[ComplaintType]:
+def resolve_get_complaints_by_order_id(orderId: int) -> List[ComplaintType]:
     # Get database session
     db = next(get_db())
     
     # Query for the specific order
-    complaints = db.query(Complaint).filter(Complaint.order_id == order_id).all()
+    complaints = db.query(Complaint).filter(Complaint.orderId == orderId).all()
     
     return [ComplaintType(
         id=complaint.id,
-        user_id=complaint.user_id,
-        order_id=complaint.order_id,
-        complaint_text=complaint.complaint_text,
+        userId=complaint.userId,
+        orderId=complaint.orderId,
+        complaintText=complaint.complaintText,
         heading=complaint.heading,
-        complaint_type=complaint.complaint_type,
+        complaintType=complaint.complaintType,
         status=complaint.status,
-        is_escalated=complaint.is_escalated,
-        response_text=complaint.response_text,
-        created_at=complaint.created_at,
-        updated_at=complaint.updated_at
+        isEscalated=complaint.isEscalated,
+        responseText=complaint.responseText,
+        createdAt=complaint.createdAt,
+        updatedAt=complaint.updatedAt
     ) for complaint in complaints]
 
 # Create properly decorated fields with resolvers and matching frontend field names
@@ -97,7 +98,6 @@ getComplaintsByUserId = strawberry.field(name="getComplaintsByUserId", resolver=
 getComplaintsByOrderId = strawberry.field(name="getComplaintsByOrderId", resolver=resolve_get_complaints_by_order_id)
 
 # Add the queries to the list
-
 queries = [
     getAllComplaints,
     getComplaintById,
