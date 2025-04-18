@@ -1,7 +1,7 @@
 import strawberry
 from typing import List, Optional
 from datetime import datetime
-from app.models.order import Order, OrderItem, OrderItemType
+from app.models.order import Order, OrderItem
 from app.models.menu_item import MenuItem
 from app.models.canteen import Canteen
 from app.models.user import User
@@ -23,7 +23,7 @@ class OrderItemInput:
     note: Optional[str] = None
 
 @strawberry.type
-class Mutation:
+class OrderMutation:
     @strawberry.mutation
     def create_order(
         self,
@@ -90,7 +90,7 @@ class Mutation:
         self,
         orderId: int,
         status: str,
-        currentUserId: int,  # Changed from user_email to currentUserId for authorization
+        currentUserId: int,
     ) -> OrderMutationResponse:
         """Update order status - only canteen vendor can update status"""
         db = next(get_db())
@@ -138,124 +138,99 @@ class Mutation:
                 message=f"Failed to update order status: {str(e)}"
             )
     
-@strawberry.input
-class OrderItemTypeInput:
-    order_item_id: int
-    order_id: int
-    menu_item_id: int
-    menu_item_name: str
-    canteen_id: int
-    canteen_name: str
-    quantity: int
-    unit_price: float
-    total_price: float
-    size: Optional[str] = None
-    extras: Optional[str] = None
-    preparation_time: Optional[int] = None
-    is_prepared: bool = False
-    special_instructions: Optional[str] = None
-    notes: Optional[str] = None
-
-
-@strawberry.type
-class OrderMutation:
     @strawberry.mutation
     def place_scheduled_order(
         self,
-        order_id: int,
-        user_id: int,
-        canteen_id: int,
-        items: List[OrderItemTypeInput],
+        userId: int,
+        canteenId: int,
+        items: List[OrderItemInput],
         subtotal: float,
-        tax_amount: float,
-        total_amount: float,
-        tax_rate: float,
-        payment_method: Optional[str] = None,
-        pickup_time: Optional[datetime] = None,
-        notes_from_customer: Optional[str] = None,
+        totalAmount: float,
+        paymentMethod: Optional[str] = None,
+        pickupTime: Optional[str] = None,
+        customerNote: Optional[str] = None,
+        phone: str = "",
     ) -> OrderMutationResponse:
-        db: Session = next(get_db())
-        now = datetime.now()
-
-        new_order = Order(
-            id=order_id,
-            user_id=user_id,
-            canteen_id=canteen_id,
-            status='scheduled',
-            subtotal=subtotal,
-            tax_rate=tax_rate,
-            tax_amount=tax_amount,
-            total_amount=total_amount,
-            payment_status=False,
-            payment_method=payment_method,
-            pickup_time=pickup_time,
-            created_at=now,
-            updated_at=now,
-            notes_from_customer=notes_from_customer,
-        )
-        db.add(new_order)
-        db.commit()
-        db.refresh(new_order)
-
-        for item in items:
-            order_item = OrderItem(
-                order_id=new_order.id,
-                id=item.order_item_id,
-                menu_item_id=item.menu_item_id,
-                menu_item_name=item.menu_item_name,
-                canteen_id=item.canteen_id,
-                canteen_name=item.canteen_name,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                total_price=item.total_price,
-                preparation_time=item.preparation_time,
-                is_prepared=False,
-                size=json.loads(item.size) if item.size else None,
-                extras=json.loads(item.extras) if item.extras else None,
-                special_instructions=item.special_instructions,
-                notes=item.notes,
-                created_at=now,
+        """Place a scheduled order"""
+        db = next(get_db())
+        try:
+            new_order = Order(
+                userId=userId,
+                canteenId=canteenId,
+                items=[{
+                    "itemId": item.itemId,
+                    "quantity": item.quantity,
+                    "customizations": item.customizations,
+                    "note": item.note
+                } for item in items],
+                totalAmount=totalAmount,
+                status="scheduled",
+                orderTime=datetime.utcnow().isoformat(),
+                paymentMethod=paymentMethod or "Cash",
+                paymentStatus="Pending",
+                customerNote=customerNote,
+                phone=phone,
+                isPreOrder=True,
+                pickupTime=pickupTime
             )
-            db.add(order_item)
-
-        db.commit()
-        return OrderMutationResponse(success=True, message=f"Scheduled order #{new_order.id} placed successfully")
+            db.add(new_order)
+            db.commit()
+            
+            return OrderMutationResponse(
+                success=True,
+                message=f"Scheduled order #{new_order.id} placed successfully",
+                orderId=new_order.id
+            )
+        except Exception as e:
+            db.rollback()
+            return OrderMutationResponse(
+                success=False,
+                message=f"Failed to place scheduled order: {str(e)}"
+            )
 
     @strawberry.mutation
     def update_order(
         self,
-        order_id: int,
-        payment_status: Optional[bool] = None,
-        payment_method: Optional[str] = None,
-        
+        orderId: int,
         status: Optional[str] = None,
-        priority: Optional[str] = None,
-        pickup_time: Optional[datetime] = None,
-        notes_for_kitchen: Optional[str] = None,
+        paymentStatus: Optional[str] = None,
+        paymentMethod: Optional[str] = None,
+        pickupTime: Optional[str] = None,
+        customerNote: Optional[str] = None,
     ) -> OrderMutationResponse:
-        db: Session = next(get_db())
-        order = db.query(Order).filter(Order.id == order_id).first()
+        """Update an existing order"""
+        db = next(get_db())
+        order = db.query(Order).filter(Order.id == orderId).first()
 
         if not order:
             return OrderMutationResponse(success=False, message="Order not found")
 
-        if status:
-            order.status = status
-        if priority:
-            order.priority = priority
-        if pickup_time:
-            order.pickup_time = pickup_time
-        if notes_for_kitchen:
-            order.notes_for_kitchen = notes_for_kitchen
-        if payment_status is not None:
-            order.payment_status = payment_status
-        if payment_method:
-            order.payment_method = payment_method
-
-        order.updated_at = datetime.now()
-        db.commit()
-
-        return OrderMutationResponse(success=True, message=f"Order #{order_id} updated successfully")
+        try:
+            if status:
+                order.status = status
+            if paymentStatus:
+                order.paymentStatus = paymentStatus
+            if paymentMethod:
+                order.paymentMethod = paymentMethod
+            if pickupTime:
+                order.pickupTime = pickupTime
+            if customerNote:
+                order.customerNote = customerNote
+                
+            order.updated_at = datetime.utcnow().isoformat()
+            db.commit()
+            
+            return OrderMutationResponse(
+                success=True,
+                message="Order updated successfully",
+                orderId=order.id
+            )
+        except Exception as e:
+            db.rollback()
+            return OrderMutationResponse(
+                success=False, 
+                message=f"Failed to update order: {str(e)}"
+            )
 
     @strawberry.mutation
     def cancel_order(
@@ -264,24 +239,25 @@ class OrderMutation:
         userId: int,
         reason: str
     ) -> OrderMutationResponse:
-        """Cancel an order - can be done by the user who placed the order or the canteen vendor"""
+        """Cancel an order"""
         db = next(get_db())
         order = db.query(Order).filter(Order.id == orderId).first()
         
         if not order:
             return OrderMutationResponse(success=False, message="Order not found")
-        
-        # Get the canteen for this order
-        canteen = db.query(Canteen).filter(Canteen.id == order.canteenId).first()
-        if not canteen:
-            return OrderMutationResponse(success=False, message="Canteen not found")
             
-        # Check if the current user :
-        # The canteen vendor
-        if canteen.userId != userId:
+        # Check if the user is authorized to cancel this order
+        if order.userId != userId:
             return OrderMutationResponse(
                 success=False,
-                message="Unauthorized: Only the canteen vendor can cancel this order"
+                message="Unauthorized: You can only cancel your own orders"
+            )
+            
+        # Check if the order can be cancelled (not already delivered, etc.)
+        if order.status in ["delivered", "completed"]:
+            return OrderMutationResponse(
+                success=False,
+                message="Cannot cancel order: Order is already delivered or completed"
             )
             
         try:
@@ -307,29 +283,32 @@ class OrderMutation:
         self,
         orderId: int,
         paymentStatus: str,
-        currentUserId: int,  # Changed from user_email to currentUserId for authorization
+        currentUserId: int,
     ) -> OrderMutationResponse:
-        """Update payment status - only canteen vendor can update payment status"""
+        """Update payment status - only canteen vendor or admin can update"""
         db = next(get_db())
         order = db.query(Order).filter(Order.id == orderId).first()
         
         if not order:
             return OrderMutationResponse(success=False, message="Order not found")
         
-        # Check if the current user is the vendor of the canteen
+        # Check if the current user is the vendor of the canteen or an admin
         canteen = db.query(Canteen).filter(Canteen.id == order.canteenId).first()
-        if not canteen:
-            return OrderMutationResponse(success=False, message="Canteen not found")
+        user = db.query(User).filter(User.id == currentUserId).first()
+        
+        if not canteen or not user:
+            return OrderMutationResponse(success=False, message="Canteen or user not found")
             
-        # Ensure the current user is the canteen vendor
-        if canteen.userId != currentUserId:
+        # Ensure the current user is authorized
+        if canteen.userId != currentUserId and user.role != "admin":
             return OrderMutationResponse(
                 success=False,
-                message="Unauthorized: Only the canteen vendor can update payment status"
+                message="Unauthorized: Only the canteen vendor or admin can update payment status"
             )
         
         try:
             order.paymentStatus = paymentStatus
+            
             db.commit()
             return OrderMutationResponse(
                 success=True,
@@ -343,12 +322,12 @@ class OrderMutation:
                 message=f"Failed to update payment status: {str(e)}"
             )
 
+# Export the mutation fields
 mutations = [
-    strawberry.field(name="createOrder", resolver=Mutation.create_order),
-    strawberry.field(name="updateOrderStatus", resolver=Mutation.update_order_status),
-    strawberry.field(name="cancelOrder", resolver=Mutation.cancel_order),
-    strawberry.field(name="updatePaymentStatus", resolver=Mutation.update_payment_status),
-    strawberry.mutation(name="placeScheduledOrder")(OrderMutation.place_scheduled_order),
-    strawberry.mutation(name="updateOrder")(OrderMutation.update_order),
-    strawberry.mutation(name="cancelOrder")(OrderMutation.cancel_order),
+    strawberry.field(name="createOrder", resolver=OrderMutation.create_order),
+    strawberry.field(name="updateOrderStatus", resolver=OrderMutation.update_order_status),
+    strawberry.field(name="placeScheduledOrder", resolver=OrderMutation.place_scheduled_order),
+    strawberry.field(name="updateOrder", resolver=OrderMutation.update_order),
+    strawberry.field(name="cancelOrder", resolver=OrderMutation.cancel_order),
+    strawberry.field(name="updatePaymentStatus", resolver=OrderMutation.update_payment_status),
 ]

@@ -14,6 +14,7 @@ from datetime import datetime
 
 @strawberry.type
 class CartItemType:
+    id: int
     cart_id: int
     menu_item_id: int
     quantity: int
@@ -25,19 +26,19 @@ class CartItemType:
 @strawberry.type
 class CartType:
     id: int
-    user_id: int
-    created_at: str  # ISO format string
-    updated_at: str  # ISO format string
+    userId: int
+    createdAt: str  # ISO format string
+    updatedAt: str  # ISO format string
     pickup_date: Optional[str]
     pickup_time: Optional[str]
     items: Optional[List[CartItemType]] = None  # if you're resolving related items
 
-def resolve_get_cart_by_user_id(user_id: int) -> Optional[CartType]:
+def resolve_get_cart_by_user_id(userId: int) -> Optional[CartType]:
     # Get database session
     db = next(get_db())
     
     # Query for the cart associated with the user
-    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
+    cart = db.query(Cart).filter(Cart.userId == userId).first()
     
     if not cart:
         return None
@@ -78,9 +79,9 @@ def resolve_get_cart_by_user_id(user_id: int) -> Optional[CartType]:
     # Create and return CartType with all items
     return CartType(
         id=cart.id,
-        user_id=cart.user_id,
-        created_at=cart.created_at.isoformat(),
-        updated_at=cart.updated_at.isoformat(),
+        userId=cart.userId,
+        createdAt=cart.createdAt,
+        updatedAt=cart.updatedAt,
         pickup_date=cart.pickup_date.isoformat() if cart.pickup_date else None,
         pickup_time=cart.pickup_time if cart.pickup_time else None,
         items=cart_items_types

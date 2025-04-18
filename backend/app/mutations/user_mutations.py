@@ -10,7 +10,7 @@ class UserMutationResponse:
     userId: Optional[int] = None
 
 @strawberry.type
-class Mutation:
+class UserMutation:
     @strawberry.mutation
     def create_user(
         self,
@@ -156,9 +156,10 @@ class Mutation:
                 message=f"Failed to deactivate user: {str(e)}"
             )
 
+# Export the mutation fields
 mutations = [
-    strawberry.field(name="createUser", resolver=Mutation.create_user),
-    strawberry.field(name="updateUserProfile", resolver=Mutation.update_user_profile),
-    strawberry.field(name="updateFavoriteCanteens", resolver=Mutation.update_favorite_canteens),
-    strawberry.field(name="deactivateUser", resolver=Mutation.deactivate_user),
+    strawberry.field(name="createUser", resolver=UserMutation.create_user),
+    strawberry.field(name="updateUserProfile", resolver=UserMutation.update_user_profile),
+    strawberry.field(name="updateFavoriteCanteens", resolver=UserMutation.update_favorite_canteens),
+    strawberry.field(name="deactivateUser", resolver=UserMutation.deactivate_user),
 ]

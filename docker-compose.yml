@@ -16,6 +16,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: smart-canteen-backend:latest
     command: sh -c "python -m app.mock_data && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend/app:/app/app  # maps local code for hot reload

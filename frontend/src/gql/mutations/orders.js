@@ -53,9 +53,68 @@ export const UPDATE_ORDER_STATUS = `
 `;
 
 /**
+ * Create a scheduled order for future pickup
+ */
+export const PLACE_SCHEDULED_ORDER = `
+  mutation PlaceScheduledOrder(
+    $userId: Int!,
+    $canteenId: Int!,
+    $items: [OrderItemInput!]!,
+    $subtotal: Float!,
+    $totalAmount: Float!,
+    $paymentMethod: String,
+    $pickupTime: String,
+    $customerNote: String,
+    $phone: String
+  ) {
+    placeScheduledOrder(
+      userId: $userId,
+      canteenId: $canteenId,
+      items: $items,
+      subtotal: $subtotal,
+      totalAmount: $totalAmount,
+      paymentMethod: $paymentMethod,
+      pickupTime: $pickupTime,
+      customerNote: $customerNote,
+      phone: $phone
+    ) {
+      success
+      message
+      orderId
+    }
+  }
+`;
+
+/**
+ * Update an existing order
+ */
+export const UPDATE_ORDER = `
+  mutation UpdateOrder(
+    $orderId: Int!,
+    $status: String,
+    $paymentStatus: String,
+    $paymentMethod: String,
+    $pickupTime: String,
+    $customerNote: String
+  ) {
+    updateOrder(
+      orderId: $orderId,
+      status: $status,
+      paymentStatus: $paymentStatus,
+      paymentMethod: $paymentMethod,
+      pickupTime: $pickupTime,
+      customerNote: $customerNote
+    ) {
+      success
+      message
+      orderId
+    }
+  }
+`;
+
+/**
  * Cancel an order
  * For customers: Can only be performed if userId matches the order's userId
- * For vendors: Can be performed if userId matches the canteen's userId
  */
 export const CANCEL_ORDER = `
   mutation CancelOrder(
@@ -77,7 +136,7 @@ export const CANCEL_ORDER = `
 
 /**
  * Update payment status
- * Can only be performed by the canteen vendor (where canteen.userId matches the authenticated user)
+ * Can only be performed by the canteen vendor or admin
  */
 export const UPDATE_PAYMENT_STATUS = `
   mutation UpdatePaymentStatus(
@@ -237,5 +296,4 @@ query GetOrderById($orderId: Int!) {
     updatedAt
   }
 }
->>>>>>> fff9908b2bc1d983fb8d961b87a53a7a4df68786
 `;

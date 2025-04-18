@@ -1,4 +1,3 @@
-
 /**
  * Query to fetch orders for a user
  */
@@ -35,87 +34,73 @@ export const GET_USER_ORDERS = `
   }
 `;
 
+/**
+ * Query to fetch all orders for a user
+ */
 export const GET_ALL_ORDERS = `
   query GetAllOrders($userId: Int!) {
-    getAllOrders(userId: $userId) {
-      user_id
-      canteen_id
-      subtotal
-      tax_amount
-      total_amount
+    getAllOrders(user_id: $userId) {
+      id
+      userId
+      canteenId
+      totalAmount
       status
-      priority
-      tax_rate
-      payment_status
-      payment_method
-      payment_id
-      cancellation_reason
-      cancellation_notes
-      pickup_time
-      created_at
-      updated_at
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
       items {
-        menu_item_id
-        menu_item_name
-        canteen_id
-        canteen_name
+        id
+        itemId
         quantity
-        unit_price
-        total_price
-        size {
-          name
-          price_adjustment
-        }
-        extras {
-          name
-          price
-        }
-        preparation_time
-        is_prepared
-        special_instructions
-        notes
+        customizations
+        note
       }
     }
   }
 `;
 
-// Get active orders for a user
+/**
+ * Query to fetch active orders for a user
+ */
 export const GET_ACTIVE_ORDERS = `
   query GetActiveOrders($userId: Int!) {
-    getActiveOrders(userId: $userId) {
-      user_id
-      canteen_id
-      subtotal
-      tax_amount
-      total_amount
+    getActiveOrders(user_id: $userId) {
+      id
+      userId
+      canteenId
+      totalAmount
       status
-      priority
-      tax_rate
-      payment_status
-      payment_method
-      payment_id
-      pickup_time
-      created_at
-      updated_at
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
       items {
-        menu_item_id
-        menu_item_name
-        canteen_id
-        canteen_name
+        id
+        itemId
         quantity
-        unit_price
-        total_price
-        size {
-          name
-          price_adjustment
-        }
-        extras {
-          name
-          price
-        }
-        preparation_time
-        is_prepared
-        special_instructions
+        customizations
+        note
       }
     }
   }
@@ -224,7 +209,7 @@ export const GET_ORDERS_BY_STATUS = `
         quantity
         customizations
         note
-              }
+      }
     }
   }
 `;

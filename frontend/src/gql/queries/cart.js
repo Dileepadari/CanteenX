@@ -5,24 +5,24 @@
 /**
  * Query to fetch all items in a user's cart
  */
-export const getCartItems = `
+export const GET_CART_ITEMS = `
   query getCartByUserId($userId: Int!) {
     getCartByUserId(userId: $userId) {
-    id
-    userId
-    createdAt
-    updatedAt
-    pickupDate
-    pickupTime
-    items {
       id
-      cartId
-      menuItemId
-      quantity
-      selectedSize
-      selectedExtras
-      specialInstructions
-      location
+      userId
+      createdAt
+      updatedAt
+      pickupDate
+      pickupTime
+      items {
+        id
+        cartId
+        menuItemId
+        quantity
+        selectedSize
+        selectedExtras
+        specialInstructions
+        location
       }
     }
   }

@@ -50,6 +50,7 @@ class ComplaintMutation:
         
         return ComplaintMutationResponse(success=True, message="Complaint created successfully.")
     
+    @strawberry.mutation
     def update_complaint(
         self,
         complaint_id: int,
@@ -87,7 +88,7 @@ class ComplaintMutation:
         
         return ComplaintMutationResponse(success=True, message="Complaint updated successfully.")
     
-    
+    @strawberry.mutation
     def close_complaint(
         self,
         complaint_id: int,
@@ -108,7 +109,7 @@ class ComplaintMutation:
         
         return ComplaintMutationResponse(success=True, message="Complaint closed successfully.")
     
-    
+    @strawberry.mutation
     def escalate_complaint(
         self,
         complaint_id: int,
@@ -129,10 +130,10 @@ class ComplaintMutation:
         
         return ComplaintMutationResponse(success=True, message="Complaint escalated successfully.")
     
-    
+
 mutations = [
-    strawberry.mutation(ComplaintMutation.create_complaint, name="createComplaint"),
-    strawberry.mutation(ComplaintMutation.update_complaint, name="updateComplaint"),
-    strawberry.mutation(ComplaintMutation.close_complaint, name="closeComplaint"),
-    strawberry.mutation(ComplaintMutation.escalate_complaint, name="escalateComplaint"),
+    strawberry.field(name="createComplaint", resolver=ComplaintMutation.create_complaint),
+    strawberry.field(name="updateComplaint", resolver=ComplaintMutation.update_complaint),
+    strawberry.field(name="closeComplaint", resolver=ComplaintMutation.close_complaint),
+    strawberry.field(name="escalateComplaint", resolver=ComplaintMutation.escalate_complaint),
 ]

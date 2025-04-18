@@ -30,7 +30,7 @@ mutation AddToCart(
 
 /*
 
-Mutation to update a cart item’s details (quantity, size, extras, etc.)
+Mutation to update a cart item's details (quantity, size, extras, etc.)
 
 */
 export const UPDATE_CART_ITEM = `
@@ -49,6 +49,26 @@ mutation UpdateCartItem(
     selectedExtras: $selectedExtras,
     specialInstructions: $specialInstructions,
     location: $location
+  ) {
+    success
+    message
+  }
+}
+`
+
+/*
+
+Mutation to remove an item from the cart
+
+*/
+export const REMOVE_FROM_CART = `
+mutation RemoveFromCart(
+  $userId: Int!,
+  $cartItemId: Int!
+) {
+  removeFromCart(
+    userId: $userId,
+    cartItemId: $cartItemId
   ) {
     success
     message

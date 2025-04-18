@@ -28,7 +28,7 @@ class CustomizationOptionsInput:
     removals: Optional[List[str]] = None
 
 @strawberry.type
-class Mutation:
+class MenuMutation:
     @strawberry.mutation
     def create_menu_item(
         self,
@@ -205,8 +205,9 @@ class Mutation:
             db.rollback()
             return MenuItemMutationResponse(success=False, message=f"Failed to delete menu item: {str(e)}")
 
+# Export the mutation fields
 mutations = [
-    strawberry.field(name="createMenuItem", resolver=Mutation.create_menu_item),
-    strawberry.field(name="updateMenuItem", resolver=Mutation.update_menu_item),
-    strawberry.field(name="deleteMenuItem", resolver=Mutation.delete_menu_item),
+    strawberry.field(name="createMenuItem", resolver=MenuMutation.create_menu_item),
+    strawberry.field(name="updateMenuItem", resolver=MenuMutation.update_menu_item),
+    strawberry.field(name="deleteMenuItem", resolver=MenuMutation.delete_menu_item),
 ]

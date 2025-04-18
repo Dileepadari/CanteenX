@@ -10,3 +10,5 @@ COPY ./app ./app
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
+
+CMD ["sh", "-c", "python -m app.mock_data && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]

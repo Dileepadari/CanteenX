@@ -5,11 +5,12 @@ import strawberry
 from strawberry.tools import create_type
 
 from app.queries import queries
-from app.mutations import mutations
 from app.mutations.menu_mutations import mutations as menu_mutations
 from app.mutations.user_mutations import mutations as user_mutations
 from app.mutations.order_mutations import mutations as order_mutations
 from app.mutations.canteen_mutations import mutations as canteen_mutations
+from app.mutations.cart_mutations import mutations as cart_mutations
+from app.mutations.complaint_mutations import mutations as complaint_mutations
 
 Query = create_type("Query", queries)
 Mutation = create_type("Mutation", [
@@ -17,7 +18,8 @@ Mutation = create_type("Mutation", [
     *user_mutations,
     *order_mutations,
     *canteen_mutations,
-    mutations
+    *cart_mutations,
+    *complaint_mutations
 ])
 
 graphql_schema = strawberry.Schema(query=Query, mutation=Mutation)

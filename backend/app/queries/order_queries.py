@@ -1,9 +1,7 @@
 import json
 import strawberry
 from typing import List, Optional
-from app.models.order import OrderType, OrderItem, OrderItemType
-
-from app.models.order import Order
+from app.models.order import OrderItem, Order
 from app.core.database import get_db
 from sqlalchemy import desc, func
 
@@ -102,196 +100,33 @@ class OrderQuery:
         orders = db.query(Order).filter(Order.status == status.lower()).all()
         return [OrderType.from_db_model(order) for order in orders]
 
-def resolve_get_all_orders(user_id: int) -> List[OrderType]:
-    """
-    Query to retrieve all orders for a specific user.
-    """
-    db = next(get_db())
-    orders_query = db.query(Order).filter(Order.user_id == user_id).order_by(desc(Order.created_at)).all()
-    result = []
+    @strawberry.field
+    def get_all_orders(self, user_id: int) -> List[OrderType]:
+        """Get all orders for a specific user"""
+        db = next(get_db())
+        orders = db.query(Order).filter(Order.userId == user_id).order_by(desc(Order.orderTime)).all()
+        return [OrderType.from_db_model(order) for order in orders]
 
-    for order in orders_query:
-        order_items_query = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-        order_items = []
+    @strawberry.field
+    def get_active_orders(self, user_id: int) -> List[OrderType]:
+        """Get all active orders for a specific user"""
+        db = next(get_db())
+        inactive_statuses = ['completed', 'cancelled', 'rejected']
+        
+        orders = db.query(Order)\
+            .filter(Order.userId == user_id)\
+            .filter(func.lower(Order.status).notin_([status.lower() for status in inactive_statuses]))\
+            .order_by(desc(Order.orderTime))\
+            .all()
+            
+        return [OrderType.from_db_model(order) for order in orders]
 
-        for item in order_items_query:
-            order_items.append(OrderItemType(
-                order_item_id=item.id,
-                order_id=item.order_id,
-                menu_item_id=item.menu_item_id,
-                menu_item_name=item.menu_item_name,
-                canteen_id=item.canteen_id,
-                canteen_name=item.canteen_name,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                total_price=item.total_price,
-                size=json.dumps(item.size) if item.size else None,  # Parse JSON string
-                extras=json.dumps(item.extras) if item.extras else None,  # Parse JSON string
-                preparation_time=item.preparation_time,
-                is_prepared=item.is_prepared,
-                special_instructions=item.special_instructions,
-                notes=item.notes
-            ))
-
-        order_data = OrderType(
-            order_id=order.id,
-            user_id=order.user_id,
-            canteen_id=order.canteen_id,
-            items=order_items,
-            subtotal=order.subtotal,
-            tax_amount=order.tax_amount,
-            total_amount=order.total_amount,
-            status=order.status,
-            priority=order.priority,
-            tax_rate=order.tax_rate,
-            payment_status=order.payment_status,
-            payment_method=order.payment_method,
-            payment_id=order.payment_id,
-            cancellation_reason=order.cancellation_reason,
-            cancellation_notes=order.cancellation_notes,
-            pickup_time=order.pickup_time,
-            created_at=order.created_at,
-            updated_at=order.updated_at
-        )
-
-        result.append(order_data)
-
-    return result
-
-
-def resolve_get_active_orders(user_id: int) -> List[OrderType]:
-    """
-    Query to retrieve all active orders for a specific user.
-    Active orders are those with status other than COMPLETED, CANCELLED, or REJECTED.
-    """
-    db = next(get_db())
-    inactive_statuses = ['completed', 'cancelled', 'rejected']
-    
-    orders_query = db.query(Order)\
-        .filter(Order.user_id == user_id)\
-        .filter(func.lower(Order.status).notin_([status.lower() for status in inactive_statuses]))\
-        .order_by(desc(Order.created_at))\
-        .all()
-    result = []
-
-    for order in orders_query:
-        order_items_query = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-        order_items = []
-
-        for item in order_items_query:
-            order_items.append(OrderItemType(
-                order_item_id=item.id,
-                order_id=item.order_id,
-                menu_item_id=item.menu_item_id,
-                menu_item_name=item.menu_item_name,
-                canteen_id=item.canteen_id,
-                canteen_name=item.canteen_name,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                total_price=item.total_price,
-                size=json.dumps(item.size) if item.size else None,  # Parse JSON string
-                extras=json.dumps(item.extras) if item.extras else None,  # Parse JSON string
-                preparation_time=item.preparation_time,
-                is_prepared=item.is_prepared,
-                special_instructions=item.special_instructions,
-                notes=item.notes
-            ))
-
-        order_data = OrderType(
-            order_id=order.id,
-            user_id=order.user_id,
-            canteen_id=order.canteen_id,
-            items=order_items,
-            subtotal=order.subtotal,
-            tax_amount=order.tax_amount,
-            total_amount=order.total_amount,
-            status=order.status,
-            priority=order.priority,
-            tax_rate=order.tax_rate,
-            payment_status=order.payment_status,
-            payment_method=order.payment_method,
-            payment_id=order.payment_id,
-            cancellation_reason=order.cancellation_reason,
-            cancellation_notes=order.cancellation_notes,
-            pickup_time=order.pickup_time,
-            created_at=order.created_at,
-            updated_at=order.updated_at
-        )
-
-        result.append(order_data)
-
-    return result
-
-
-def resolve_get_order_by_id(order_id: int) -> Optional[OrderType]:
-    """
-    Query to retrieve a specific order by its ID.
-    Includes a user_id parameter for security validation.
-    """
-    db = next(get_db())
-    order = db.query(Order).filter(
-        Order.id == order_id
-    ).first()
-
-    if not order:
-        return None
-
-    order_items_query = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-    order_items = []
-
-    for item in order_items_query:
-        order_items.append(OrderItemType(
-            order_item_id=item.id,
-            order_id=item.order_id,
-            menu_item_id=item.menu_item_id,
-            menu_item_name=item.menu_item_name,
-            canteen_id=item.canteen_id,
-            canteen_name=item.canteen_name,
-            quantity=item.quantity,
-            unit_price=item.unit_price,
-            total_price=item.total_price,
-            size=json.dumps(item.size) if item.size else None,  # Parse JSON string
-            extras=json.dumps(item.extras) if item.extras else None,  # Parse JSON string
-            preparation_time=item.preparation_time,
-            is_prepared=item.is_prepared,
-            special_instructions=item.special_instructions,
-            notes=item.notes
-        ))
-
-    order_data = OrderType(
-        order_id=order.id,
-        user_id=order.user_id,
-        canteen_id=order.canteen_id,
-        items=order_items,
-        subtotal=order.subtotal,
-        tax_amount=order.tax_amount,
-        total_amount=order.total_amount,
-        status=order.status,
-        priority=order.priority,
-        tax_rate=order.tax_rate,
-        payment_status=order.payment_status,
-        payment_method=order.payment_method,
-        payment_id=order.payment_id,
-        cancellation_reason=order.cancellation_reason,
-        cancellation_notes=order.cancellation_notes,
-        pickup_time=order.pickup_time,
-        created_at=order.created_at,
-        updated_at=order.updated_at
-    )
-
-    return order_data
-
-getAllOrders = strawberry.field(name="getAllOrders", resolver=resolve_get_all_orders)
-getActiveOrders = strawberry.field(name="getActiveOrders", resolver=resolve_get_active_orders)
-getOrderById = strawberry.field(name="getOrderById", resolver=resolve_get_order_by_id)
-
+# Export the query fields
 queries = [
-    getAllOrders,
-    getActiveOrders,
-    getOrderById,
     strawberry.field(name="getUserOrders", resolver=OrderQuery.get_user_orders),
     strawberry.field(name="getCanteenOrders", resolver=OrderQuery.get_canteen_orders),
     strawberry.field(name="getOrderById", resolver=OrderQuery.get_order_by_id),
     strawberry.field(name="getOrdersByStatus", resolver=OrderQuery.get_orders_by_status),
-
+    strawberry.field(name="getAllOrders", resolver=OrderQuery.get_all_orders),
+    strawberry.field(name="getActiveOrders", resolver=OrderQuery.get_active_orders),
 ]

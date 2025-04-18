@@ -31,11 +31,12 @@ class CartMutation:
         selected_extras_json = json.loads(selected_extras) if selected_extras else None
 
         # Find or create a cart for the user
-        cart = db.query(Cart).filter(Cart.user_id == user_id).first()
+        cart = db.query(Cart).filter(Cart.userId == user_id).first()
         now = datetime.now(timezone.utc)
         if not cart:
+            cart = Cart(userId=user_id, createdAt=now.isoformat(), updatedAt=now.isoformat())
             db.add(cart)
-            cart = Cart(user_id=user_id, created_at=now, updated_at=now)
+            db.commit()
             db.refresh(cart)
 
         # Check if item already exists in cart
@@ -60,7 +61,7 @@ class CartMutation:
             )
             db.add(new_cart_item)
 
-        cart.updated_at = now
+        cart.updatedAt = now.isoformat()
         db.commit()
         return CartMutationResponse(success=True, message="Item added to cart")
 
@@ -94,19 +95,44 @@ class CartMutation:
 
         cart = db.query(Cart).filter(Cart.id == cart_item.cart_id).first()
         if cart:
-            cart.updated_at = datetime.now(timezone.utc)
+            cart.updatedAt = datetime.now(timezone.utc).isoformat()
+        db.commit()
         return CartMutationResponse(success=True, message="Cart item updated")
+
+    @strawberry.mutation
+    def remove_from_cart(
+        self,
+        user_id: int,
+        cart_item_id: int,
+    ) -> CartMutationResponse:
+        db: Session = next(get_db())
+        cart_item = db.query(CartItem).filter(CartItem.id == cart_item_id).first()
+
+        if not cart_item:
+            return CartMutationResponse(success=False, message="Cart item not found")
+
+        # Verify this cart item belongs to the user
+        cart = db.query(Cart).filter(Cart.id == cart_item.cart_id).first()
+        if not cart or cart.userId != user_id:
+            return CartMutationResponse(success=False, message="Cart item does not belong to this user")
+
+        # Remove the item
+        db.delete(cart_item)
+        cart.updatedAt = datetime.now(timezone.utc).isoformat()
+        db.commit()
+
+        return CartMutationResponse(success=True, message="Item removed from cart")
 
     @strawberry.mutation
     def clear_cart(self, user_id: int) -> CartMutationResponse:
         db: Session = next(get_db())
-        cart = db.query(Cart).filter(Cart.user_id == user_id).first()
+        cart = db.query(Cart).filter(Cart.userId == user_id).first()
 
         if not cart:
             return CartMutationResponse(success=False, message="Cart not found")
 
         db.query(CartItem).filter(CartItem.cart_id == cart.id).delete()
-        cart.updated_at = datetime.now(timezone.utc)
+        cart.updatedAt = datetime.now(timezone.utc).isoformat()
         db.commit()
 
         return CartMutationResponse(success=True, message="Cart cleared successfully")
@@ -116,5 +142,6 @@ class CartMutation:
 mutations = [
     strawberry.field(name="addToCart", resolver=CartMutation.add_to_cart),
     strawberry.field(name="updateCartItem", resolver=CartMutation.update_cart_item),
+    strawberry.field(name="removeFromCart", resolver=CartMutation.remove_from_cart),
     strawberry.field(name="clearCart", resolver=CartMutation.clear_cart),
 ]

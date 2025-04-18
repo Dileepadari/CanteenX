@@ -424,14 +424,23 @@ export const canteens = [
   ];
   
   // User data
-  export const userData = {
+  export const userData = [{
     id: 1,
     name: "Aryan Kumar",
     email: "aryan.kumar@example.edu",
     role: "student",
     favoriteCanteens: [1, 2],
     recentOrders: [1001, 1002]
-  };
+  } , 
+  {
+    id:2,
+    name:"Admin User",
+    email : "admin@example.edu",
+    role : "admin",
+    favoriteCanteens : [],
+    recentOrders : []
+}
+] ;
   
   // Payment method options
   export const paymentMethodOptions = [
