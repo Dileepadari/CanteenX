@@ -35,7 +35,7 @@ class OrderType:
     items: List[OrderItemType]
 
 # Resolver for getting active orders for a user
-def resolve_get_active_orders(userId: int) -> List[OrderType]:
+def resolve_get_active_orders(userId: str) -> List[OrderType]:
     # Get database session
     db = next(get_db())
     
@@ -90,7 +90,7 @@ def resolve_get_active_orders(userId: int) -> List[OrderType]:
     return result
 
 # Resolver for getting order history for a user
-def resolve_get_order_history(userId: int, limit: Optional[int] = None, offset: Optional[int] = 0) -> List[OrderType]:
+def resolve_get_order_history(userId: str, limit: Optional[int] = None, offset: Optional[int] = 0) -> List[OrderType]:
     # Get database session
     db = next(get_db())
     

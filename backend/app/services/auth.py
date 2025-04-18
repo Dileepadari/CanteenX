@@ -7,12 +7,7 @@ from datetime import datetime, timedelta
 import os
 from app.core.database import get_db
 from app.models.user import User
-
-@strawberry.type
-class UserType:
-    id: str
-    username: str
-    role: str
+from app.models.user_types import UserType  # Import from a central location
 
 @strawberry.type
 class LoginResponse:
@@ -45,7 +40,8 @@ class Mutation:
                     message="Invalid credentials",
                     user=UserType(
                         id="0",
-                        username=username,
+                        name=username,
+                        email="",
                         role="unknown"
                     )
                 )
@@ -53,7 +49,7 @@ class Mutation:
 
             # Create access and refresh tokens
             access_token = jwt.encode(
-                {"user_id": user.id, "username": user.name, "role": user.role, "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
+                {"user_id": user.id, "name": user.name, "role": user.role, "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
                 JWT_SECRET, algorithm=ALGORITHM
             )
 
@@ -66,7 +62,6 @@ class Mutation:
             response.set_cookie(
                 key="accessToken",
                 value=access_token,
-                httponly=True,
                 secure=os.getenv("ENV") == "production",
                 max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
             )
@@ -74,7 +69,6 @@ class Mutation:
             response.set_cookie(
                 key="refreshToken",
                 value=refresh_token,
-                httponly=True,
                 secure=os.getenv("ENV") == "production",
                 max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
             )
@@ -84,7 +78,8 @@ class Mutation:
                 message="Login successful",
                 user=UserType(
                     id=user.id,
-                    username=user.name,
+                    name=user.name,
+                    email=user.email,
                     role=user.role
                 )
             )
@@ -95,7 +90,8 @@ class Mutation:
                 message="Internal error occurred",
                 user=UserType(
                     id="0",
-                    username=username,
+                    name=username,
+                    email="",
                     role="unknown"
                 )
             )
