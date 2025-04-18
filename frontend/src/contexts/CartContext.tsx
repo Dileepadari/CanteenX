@@ -1,135 +1,162 @@
-'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { menuItems as allMenuItems } from "@/data/mockData";
 
-// Define the type for menu items
-export interface MenuItem {
-  id: string;
+export interface CartItem {
+  id: number;
+  itemId: number;
   name: string;
   price: number;
-  description?: string;
-  image?: string;
   quantity: number;
-  customizations?: Record<string, string | boolean | number>;
+  canteenId: number;
+  canteenName: string;
+  image: string;
+  customizations?: string[];
 }
 
-// Define the CartContext type
 interface CartContextType {
-  cartItems: MenuItem[];
-  addToCart: (item: MenuItem) => void;
-  removeFromCart: (itemId: string) => void;
-  updateQuantity: (itemId: string, quantity: number) => void;
+  items: CartItem[];
+  totalItems: number;
+  totalPrice: number;
+  addItem: (item: CartItem) => void;
+  removeItem: (id: number) => void;
+  updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
-  setCartItems: (items: MenuItem[]) => void;
-  getTotalPrice: () => number;
-  getItemCount: () => number;
+  checkout: () => void;
 }
 
-// Define props type for CartProvider
-interface CartProviderProps {
-  children: ReactNode;
-}
+const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Create the context with a default value
-const CartContext = createContext<CartContextType>({
-  cartItems: [],
-  addToCart: () => {},
-  removeFromCart: () => {},
-  updateQuantity: () => {},
-  clearCart: () => {},
-  setCartItems: () => {},
-  getTotalPrice: () => 0,
-  getItemCount: () => 0,
-});
+export const useCart = () => {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error("useCart must be used within a CartProvider");
+  }
+  return context;
+};
 
-// Custom hook to use the cart context
-export const useCart = () => useContext(CartContext);
+export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [items, setItems] = useState<CartItem[]>([]);
+  const { toast } = useToast();
 
-// CartProvider component to wrap your app
-export function CartProvider({ children }: CartProviderProps) {
-  // Initialize cart state, check localStorage for any existing cart
-  const [cartItems, setCartItems] = useState<MenuItem[]>([]);
-
-  // Load cart from localStorage on component mount
+  // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem('cart');
+    const savedCart = localStorage.getItem("smartCanteenCart");
     if (savedCart) {
       try {
-        setCartItems(JSON.parse(savedCart));
+        setItems(JSON.parse(savedCart));
       } catch (error) {
-        console.error('Failed to parse cart from localStorage:', error);
-        localStorage.removeItem('cart');
+        console.error("Failed to parse saved cart:", error);
       }
     }
   }, []);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    localStorage.setItem("smartCanteenCart", JSON.stringify(items));
+  }, [items]);
 
-  // Add item to cart
-  const addToCart = (item: MenuItem) => {
-    setCartItems(prevItems => {
-      const existingItem = prevItems.find(i => i.id === item.id && 
-        JSON.stringify(i.customizations) === JSON.stringify(item.customizations));
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const addItem = useCallback((newItem: CartItem) => {
+    setItems(prev => {
+      // Check if item from same canteen
+      const hasItemsFromOtherCanteen = prev.some(item => item.canteenId !== newItem.canteenId && prev.length > 0);
       
-      if (existingItem) {
-        // If item exists, update its quantity
-        return prevItems.map(i => 
-          i.id === item.id && JSON.stringify(i.customizations) === JSON.stringify(item.customizations)
-            ? { ...i, quantity: i.quantity + item.quantity }
-            : i
-        );
+      if (hasItemsFromOtherCanteen) {
+        toast({
+          title: "Cannot add items from multiple canteens",
+          description: "Please complete your current order or clear your cart first.",
+          variant: "destructive",
+        });
+        return prev;
+      }
+
+      // Check if item already exists
+      const existingItemIndex = prev.findIndex(item => item.itemId === newItem.itemId);
+      
+      if (existingItemIndex >= 0) {
+        // Update quantity if item exists
+        const updatedItems = [...prev];
+        updatedItems[existingItemIndex].quantity += newItem.quantity;
+        
+        toast({
+          title: "Item quantity updated",
+          description: `${newItem.name} quantity increased to ${updatedItems[existingItemIndex].quantity}`,
+        });
+        
+        return updatedItems;
       } else {
-        // Otherwise add new item
-        return [...prevItems, item];
+        // Add new item
+        toast({
+          title: "Item added to cart",
+          description: `${newItem.name} added to your order`,
+        });
+        
+        return [...prev, { ...newItem, id: Date.now() }];
       }
     });
-  };
+  }, [toast]);
 
-  // Remove item from cart
-  const removeFromCart = (itemId: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
-  };
+  const removeItem = useCallback((id: number) => {
+    setItems(prev => {
+      const itemToRemove = prev.find(item => item.id === id);
+      if (itemToRemove) {
+        toast({
+          title: "Item removed",
+          description: `${itemToRemove.name} removed from your order`,
+        });
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  }, [toast]);
 
-  // Update item quantity
-  const updateQuantity = (itemId: string, quantity: number) => {
-    setCartItems(prevItems => 
-      prevItems.map(item => 
-        item.id === itemId ? { ...item, quantity } : item
+  const updateQuantity = useCallback((id: number, quantity: number) => {
+    if (quantity < 1) {
+      removeItem(id);
+      return;
+    }
+    
+    setItems(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, quantity } : item
       )
     );
-  };
+  }, [removeItem]);
 
-  // Clear the entire cart
-  const clearCart = () => {
-    setCartItems([]);
-  };
+  const clearCart = useCallback(() => {
+    setItems([]);
+    toast({
+      title: "Cart cleared",
+      description: "All items have been removed from your cart",
+    });
+  }, [toast]);
 
-  // Calculate total price of items in cart
-  const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
+  const checkout = useCallback(() => {
+    // In a real app, this would send the order to the backend
+    toast({
+      title: "Order placed successfully",
+      description: `Your order of ${totalItems} items has been placed`,
+    });
+    setItems([]);
+  }, [totalItems, toast]);
 
-  // Get total number of items in cart
-  const getItemCount = () => {
-    return cartItems.reduce((count, item) => count + item.quantity, 0);
-  };
-
-  // Provide the cart context to children
   return (
-    <CartContext.Provider value={{
-      cartItems,
-      addToCart,
-      removeFromCart,
-      updateQuantity,
-      clearCart,
-      setCartItems,
-      getTotalPrice,
-      getItemCount
-    }}>
+    <CartContext.Provider
+      value={{
+        items,
+        totalItems,
+        totalPrice,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        checkout,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );
-}
+};
