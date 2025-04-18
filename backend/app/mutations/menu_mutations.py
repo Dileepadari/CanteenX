@@ -1,231 +1,212 @@
 import strawberry
-from typing import Optional
-from sqlalchemy.orm import Session
-from app.core.database import get_db
+from typing import Optional, List
+import json
 from app.models.menu_item import MenuItem
 from app.models.canteen import Canteen
-import json
+from app.core.database import get_db
 
 @strawberry.type
 class MenuItemMutationResponse:
     success: bool
     message: str
+    itemId: Optional[int] = None
+
+@strawberry.input
+class SizeOptionInput:
+    name: str
+    price: float
+
+@strawberry.input
+class AdditionOptionInput:
+    name: str
+    price: float
+
+@strawberry.input
+class CustomizationOptionsInput:
+    sizes: Optional[List[SizeOptionInput]] = None
+    additions: Optional[List[AdditionOptionInput]] = None
+    removals: Optional[List[str]] = None
 
 @strawberry.type
 class Mutation:
     @strawberry.mutation
     def create_menu_item(
         self,
-        user_email: str,
         name: str,
         price: float,
-        canteen_id: int,
+        canteenId: int,
+        canteenName: str,
+        currentUserId: int,
         description: Optional[str] = None,
-        image_url: Optional[str] = None,
+        image: Optional[str] = None,
         category: Optional[str] = None,
-        is_vegetarian: Optional[bool] = None,
-        is_featured: Optional[bool] = None,
+        tags: Optional[List[str]] = None,
+        isPopular: bool = False,
+        preparationTime: int = 15,
+        customizationOptions: Optional[CustomizationOptionsInput] = None,
     ) -> MenuItemMutationResponse:
-        """Create a new menu item if the user has permission"""
+        """Create a new menu item"""
         db = next(get_db())
         
-        # Get the canteen to verify permissions
-        canteen = db.query(Canteen).filter(Canteen.id == canteen_id).first()
+        # Verify canteen exists
+        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
         if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
-            
-        # Check if user has permission (email matches canteen email)
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to add items to this canteen")
-            
-        # Create the new menu item
-        new_item = MenuItem(
-            name=name,
-            price=price,
-            canteen_id=canteen_id,
-            description=description,
-            image_url=image_url,
-            category=category,
-            is_vegetarian=1 if is_vegetarian else 0,
-            is_featured=1 if is_featured else 0,
-            is_available=1  # New items are available by default
-        )
+            return MenuItemMutationResponse(
+                success=False, 
+                message="Canteen not found"
+            )
         
-        db.add(new_item)
-        db.commit()
-        db.refresh(new_item)
+        # Check if current user is the owner of this canteen
+        if canteen.userId != currentUserId:
+            return MenuItemMutationResponse(
+                success=False,
+                message="Unauthorized: You don't have permission to add items to this canteen"
+            )
         
-        return MenuItemMutationResponse(success=True, message=f"Menu item '{name}' created successfully")
+        try:
+            # Convert CustomizationOptionsInput to dictionary for database storage
+            customization_dict = None
+            if customizationOptions:
+                customization_dict = {
+                    "sizes": [{"name": size.name, "price": size.price} for size in customizationOptions.sizes] if customizationOptions.sizes else None,
+                    "additions": [{"name": addition.name, "price": addition.price} for addition in customizationOptions.additions] if customizationOptions.additions else None,
+                    "removals": customizationOptions.removals
+                }
+            
+            new_item = MenuItem(
+                name=name,
+                price=price,
+                canteenId=canteenId,
+                canteenName=canteenName,
+                description=description,
+                image=image,
+                category=category,
+                tags=tags,
+                isPopular=isPopular,
+                preparationTime=preparationTime,
+                customizationOptions=customization_dict,
+                isAvailable=True,
+                rating=0.0,
+                ratingCount=0
+            )
+            db.add(new_item)
+            db.commit()
+            return MenuItemMutationResponse(
+                success=True, 
+                message=f"Menu item '{name}' created successfully",
+                itemId=new_item.id
+            )
+        except Exception as e:
+            db.rollback()
+            return MenuItemMutationResponse(
+                success=False, 
+                message=f"Failed to create menu item: {str(e)}"
+            )
 
     @strawberry.mutation
-    def update_menu_item_price(self, item_id: int, price: float, user_email: str) -> MenuItemMutationResponse:
-        """Update the price of a menu item if the user has permission"""
+    def update_menu_item(
+        self,
+        itemId: int,
+        currentUserId: int,
+        name: Optional[str] = None,
+        price: Optional[float] = None,
+        description: Optional[str] = None,
+        image: Optional[str] = None,
+        category: Optional[str] = None,
+        isAvailable: Optional[bool] = None,
+        isPopular: Optional[bool] = None,
+        preparationTime: Optional[int] = None,
+        customizationOptions: Optional[CustomizationOptionsInput] = None,
+    ) -> MenuItemMutationResponse:
+        """Update a menu item"""
         db = next(get_db())
         
-        # Find the menu item
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
+        # Find and verify item
+        item = db.query(MenuItem).filter(MenuItem.id == itemId).first()
+        if not item:
             return MenuItemMutationResponse(success=False, message="Menu item not found")
             
-        # Get the canteen associated with the item
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
+        canteen = db.query(Canteen).filter(Canteen.id == item.canteenId).first()
         if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
+            return MenuItemMutationResponse(
+                success=False, 
+                message="Canteen not found"
+            )
             
-        # Check if user has permission (email matches canteen email)
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to update this item")
-            
-        # Update the price
-        menu_item.price = price
-        db.commit()
+        # Check if current user is the owner of this canteen
+        if canteen.userId != currentUserId:
+            return MenuItemMutationResponse(
+                success=False,
+                message="Unauthorized: You don't have permission to update items in this canteen"
+            )
         
-        return MenuItemMutationResponse(success=True, message="Price updated successfully")
-
-    @strawberry.mutation
-    def update_menu_item_availability(self, item_id: int, is_available: bool, user_email: str) -> MenuItemMutationResponse:
-        """Update the availability of a menu item if the user has permission"""
-        db = next(get_db())
-        
-        # Find the menu item
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
+        try:
+            # Update only provided fields
+            if name is not None: item.name = name
+            if price is not None: item.price = price
+            if description is not None: item.description = description
+            if image is not None: item.image = image
+            if category is not None: item.category = category
+            if isAvailable is not None: item.isAvailable = isAvailable
+            if isPopular is not None: item.isPopular = isPopular
+            if preparationTime is not None: item.preparationTime = preparationTime
             
-        # Get the canteen associated with the item
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
-        if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
+            # Convert CustomizationOptionsInput to dictionary for database storage
+            if customizationOptions is not None:
+                customization_dict = {
+                    "sizes": [{"name": size.name, "price": size.price} for size in customizationOptions.sizes] if customizationOptions.sizes else None,
+                    "additions": [{"name": addition.name, "price": addition.price} for addition in customizationOptions.additions] if customizationOptions.additions else None,
+                    "removals": customizationOptions.removals
+                }
+                item.customizationOptions = customization_dict
             
-        # Check if user has permission (email matches canteen email)
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to update this item")
-            
-        # Update the availability
-        menu_item.is_available = 1 if is_available else 0
-        db.commit()
-        
-        return MenuItemMutationResponse(success=True, message="Availability updated successfully")
+            db.commit()
+            return MenuItemMutationResponse(
+                success=True,
+                message="Menu item updated successfully",
+                itemId=item.id
+            )
+        except Exception as e:
+            db.rollback()
+            return MenuItemMutationResponse(success=False, message=f"Failed to update menu item: {str(e)}")
 
     @strawberry.mutation
     def delete_menu_item(
         self,
-        item_id: int,
-        user_email: str
+        itemId: int,
+        currentUserId: int
     ) -> MenuItemMutationResponse:
-        """Delete a menu item if the user has permission"""
+        """Delete a menu item"""
         db = next(get_db())
         
-        # Find the menu item
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
+        item = db.query(MenuItem).filter(MenuItem.id == itemId).first()
+        if not item:
             return MenuItemMutationResponse(success=False, message="Menu item not found")
             
-        # Get the canteen associated with the item
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
+        canteen = db.query(Canteen).filter(Canteen.id == item.canteenId).first()
         if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
+            return MenuItemMutationResponse(
+                success=False, 
+                message="Canteen not found"
+            )
             
-        # Check if user has permission (email matches canteen email)
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to delete this item")
-            
-        # Delete the menu item
-        db.delete(menu_item)
-        db.commit()
-        
-        return MenuItemMutationResponse(success=True, message=f"Menu item '{menu_item.name}' deleted successfully")
-
-    @strawberry.mutation
-    def toggle_featured_status(
-        self,
-        item_id: int,
-        user_email: str
-    ) -> MenuItemMutationResponse:
-        """Toggle the featured status of a menu item"""
-        db = next(get_db())
-        
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
-            
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
-        if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
-            
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to update this item")
-            
-        # Toggle the featured status
-        menu_item.is_featured = 0 if menu_item.is_featured == 1 else 1
-        db.commit()
-        
-        status = "featured" if menu_item.is_featured == 1 else "unfeatured"
-        return MenuItemMutationResponse(success=True, message=f"Menu item {status} successfully")
-
-    @strawberry.mutation
-    def update_preparation_time(
-        self,
-        item_id: int,
-        preparation_time: int,
-        user_email: str
-    ) -> MenuItemMutationResponse:
-        """Update the preparation time of a menu item"""
-        db = next(get_db())
-        
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
-            
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
-        if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
-            
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to update this item")
-            
-        menu_item.preparation_time = preparation_time
-        db.commit()
-        
-        return MenuItemMutationResponse(success=True, message=f"Preparation time updated to {preparation_time} minutes")
-
-    @strawberry.mutation
-    def update_size_variations(
-        self,
-        item_id: int,
-        size_options: str,  # JSON string
-        user_email: str
-    ) -> MenuItemMutationResponse:
-        """Update the size variations and pricing for a menu item"""
-        db = next(get_db())
-        
-        menu_item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
-        if not menu_item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
-            
-        canteen = db.query(Canteen).filter(Canteen.id == menu_item.canteen_id).first()
-        if not canteen:
-            return MenuItemMutationResponse(success=False, message="Canteen not found")
-            
-        if canteen.email != user_email:
-            return MenuItemMutationResponse(success=False, message="Unauthorized: You don't have permission to update this item")
+        # Check if current user is the owner of this canteen
+        if canteen.userId != currentUserId:
+            return MenuItemMutationResponse(
+                success=False,
+                message="Unauthorized: You don't have permission to delete items from this canteen"
+            )
         
         try:
-            # Validate JSON format
-            variations = json.loads(size_options)
-            menu_item.size_options = size_options
-            menu_item.has_size_variations = bool(variations)  # Set to True if variations exist
+            db.delete(item)
             db.commit()
-            return MenuItemMutationResponse(success=True, message="Size variations updated successfully")
-        except json.JSONDecodeError:
-            return MenuItemMutationResponse(success=False, message="Invalid JSON format for size variations")
+            return MenuItemMutationResponse(success=True, message=f"Menu item deleted successfully")
+        except Exception as e:
+            db.rollback()
+            return MenuItemMutationResponse(success=False, message=f"Failed to delete menu item: {str(e)}")
 
 mutations = [
     strawberry.field(name="createMenuItem", resolver=Mutation.create_menu_item),
-    strawberry.field(name="updateMenuItemPrice", resolver=Mutation.update_menu_item_price),
-    strawberry.field(name="updateMenuItemAvailability", resolver=Mutation.update_menu_item_availability),
+    strawberry.field(name="updateMenuItem", resolver=Mutation.update_menu_item),
     strawberry.field(name="deleteMenuItem", resolver=Mutation.delete_menu_item),
-    strawberry.field(name="toggleFeaturedStatus", resolver=Mutation.toggle_featured_status),
-    strawberry.field(name="updatePreparationTime", resolver=Mutation.update_preparation_time),
-    strawberry.field(name="updateSizeVariations", resolver=Mutation.update_size_variations)
 ]

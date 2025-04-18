@@ -3,59 +3,72 @@
  */
 
 /**
- * Query to fetch active orders for the current user
- * Active orders are those with status other than "Completed" or "Cancelled"
+ * Query to fetch orders for a user
  */
-export const GET_ACTIVE_ORDERS = `
-  query GetActiveOrders($userId: Int!) {
-    getActiveOrders(userId: $userId) {
+export const GET_USER_ORDERS = `
+  query GetUserOrders($userId: Int!) {
+    getUserOrders(userId: $userId) {
       id
-      date
-      total
+      userId
+      canteenId
+      totalAmount
       status
-      canteenName
-      vendorName
-      estimatedDeliveryTime
-      currentStatus
-      steps {
-        status
-        description
-        time
-        completed
-        current
-      }
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
       items {
         id
-        name
-        price
+        itemId
         quantity
         customizations
-        vendorName
+        note
       }
     }
   }
 `;
 
 /**
- * Query to fetch order history for the current user
- * Order history includes all past orders (completed or cancelled)
+ * Query to fetch orders for a canteen
  */
-export const GET_ORDER_HISTORY = `
-  query GetOrderHistory($userId: Int!, $limit: Int, $offset: Int) {
-    getOrderHistory(userId: $userId, limit: $limit, offset: $offset) {
+export const GET_CANTEEN_ORDERS = `
+  query GetCanteenOrders($canteenId: Int!) {
+    getCanteenOrders(canteenId: $canteenId) {
       id
-      date
-      total
+      userId
+      canteenId
+      totalAmount
       status
-      canteenName
-      vendorName
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
       items {
         id
-        name
-        price
+        itemId
         quantity
         customizations
-        vendorName
+        note
       }
     }
   }
@@ -65,30 +78,69 @@ export const GET_ORDER_HISTORY = `
  * Query to fetch a specific order by ID
  */
 export const GET_ORDER_BY_ID = `
-  query GetOrderById($orderId: String!) {
+  query GetOrderById($orderId: Int!) {
     getOrderById(orderId: $orderId) {
       id
-      date
-      total
+      userId
+      canteenId
+      totalAmount
       status
-      canteenName
-      vendorName
-      estimatedDeliveryTime
-      currentStatus
-      steps {
-        status
-        description
-        time
-        completed
-        current
-      }
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
       items {
         id
-        name
-        price
+        itemId
         quantity
         customizations
-        vendorName
+        note
+      }
+    }
+  }
+`;
+
+/**
+ * Query to fetch orders by status
+ */
+export const GET_ORDERS_BY_STATUS = `
+  query GetOrdersByStatus($status: String!) {
+    getOrdersByStatus(status: $status) {
+      id
+      userId
+      canteenId
+      totalAmount
+      status
+      orderTime
+      confirmedTime
+      preparingTime
+      readyTime
+      deliveryTime
+      cancelledTime
+      pickupTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      cancellationReason
+      discount
+      phone
+      isPreOrder
+      items {
+        id
+        itemId
+        quantity
+        customizations
+        note
       }
     }
   }

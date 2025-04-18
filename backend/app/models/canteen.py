@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class Canteen(Base):
@@ -6,26 +7,17 @@ class Canteen(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    location = Column(String, nullable=False)
+    image = Column(String)
+    location = Column(String)
+    rating = Column(Float, default=0.0)
+    openTime = Column(String)  # Changed from Time to String to match frontend
+    closeTime = Column(String)  # Changed from Time to String to match frontend
+    isOpen = Column(Boolean, default=True)  # Changed from is_open to match frontend
+    description = Column(String)
+    phone = Column(String)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=True)
     
-    # Contact information
-    email = Column(String, nullable=True)
-    contact_number = Column(String, nullable=True)
-    
-    # Operating hours
-    breakfast_start = Column(String, nullable=True)
-    breakfast_end = Column(String, nullable=True)
-    lunch_start = Column(String, nullable=True)
-    lunch_end = Column(String, nullable=True)
-    dinner_start = Column(String, nullable=True)
-    dinner_end = Column(String, nullable=True)
-    
-    # Rating system
-    rating = Column(Float, nullable=True, default=0.0)
-    rating_count = Column(Integer, nullable=True, default=0)
-    
-    # Additional details
-    description = Column(Text, nullable=True)
-    supports_vegetarian = Column(Integer, nullable=True, default=1)
-    supports_non_vegetarian = Column(Integer, nullable=True, default=1)
-    supports_thali = Column(Integer, nullable=True, default=1)
+    # Relationships
+    menu_items = relationship("MenuItem", back_populates="canteen")
+    orders = relationship("Order", back_populates="canteen")
+    user = relationship("User", back_populates="canteens")
