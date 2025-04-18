@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.log
+*.env
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+*.swp
+coverage/
+*.iml
+.idea/
+# *.pyc
