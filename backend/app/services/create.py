@@ -7,17 +7,10 @@ from app.core.database import get_db
 import uuid
 from sqlalchemy.exc import SQLAlchemyError
 from app.models.user import User
+from app.models.user_types import UserType
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
-@strawberry.type
-class UserType:
-    id: str
-    name: str
-    email: str
-    password: str
-    role: str
 
 @strawberry.type
 class SignupResponse:

@@ -1,210 +1,131 @@
-import strawberry
 import json
+import strawberry
 from typing import List, Optional
-from app.models.order import Order, OrderItem, OrderStep
+from app.models.order import OrderItem, Order
 from app.core.database import get_db
-
-@strawberry.type
-class OrderStepType:
-    status: str
-    description: str
-    time: Optional[str]
-    completed: bool
-    current: bool
+from sqlalchemy import desc, func
+from datetime import datetime
 
 @strawberry.type
 class OrderItemType:
-    id: str
-    name: str
-    price: float
+    id: Optional[int] = None  # Made optional to avoid missing key error
+    itemId: int
     quantity: int
-    customizations: List[str]
-    vendor_name: str
+    customizations: Optional[List[str]] = None
+    note: Optional[str] = None
 
 @strawberry.type
 class OrderType:
-    id: str
-    date: str
-    total: float
+    id: int
+    userId: int
+    canteenId: int
+    items: List[OrderItemType]  # List of OrderItemType objects
+    totalAmount: float
     status: str
-    canteen_name: str
-    vendor_name: str
-    estimated_delivery_time: Optional[str]
-    current_status: Optional[str]
-    steps: List[OrderStepType]
-    items: List[OrderItemType]
+    orderTime: str
+    confirmedTime: Optional[str] = None
+    preparingTime: Optional[str] = None
+    readyTime: Optional[str] = None
+    deliveryTime: Optional[str] = None
+    paymentMethod: str
+    paymentStatus: str
+    customerNote: Optional[str] = None
+    discount: float
+    phone: str
+    pickupTime: Optional[str] = None
+    isPreOrder: bool
+    cancelledTime: Optional[str] = None
+    cancellationReason: Optional[str] = None
 
-# Resolver for getting active orders for a user
-def resolve_get_active_orders(userId: str) -> List[OrderType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query active orders for the user
-    active_orders = db.query(Order).filter(
-        Order.user_id == userId,
-        Order.status.notin_(["Completed", "Cancelled"])
-    ).all()
-    
-    result = []
-    
-    for order in active_orders:
-        # Get order steps
-        steps = db.query(OrderStep).filter(OrderStep.order_id == order.id).all()
-        
-        # Get order items
-        items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-        
-        # Convert to OrderType
-        result.append(
-            OrderType(
-                id=order.id,
-                date=order.date.isoformat() + ".000Z",
-                total=order.total,
-                status=order.status,
-                canteen_name=order.canteen_name,
-                vendor_name=order.vendor_name,
-                estimated_delivery_time=order.estimated_delivery_time,
-                current_status=order.current_status,
-                steps=[
-                    OrderStepType(
-                        status=step.status,
-                        description=step.description,
-                        time=step.time,
-                        completed=bool(step.completed),
-                        current=bool(step.current)
-                    ) for step in steps
-                ],
-                items=[
-                    OrderItemType(
-                        id=str(item.id),
-                        name=item.name,
-                        price=item.price,
-                        quantity=item.quantity,
-                        customizations=json.loads(item.customizations) if item.customizations else [],
-                        vendor_name=item.vendor_name
-                    ) for item in items
-                ]
+def map_order_to_type(order: Order) -> OrderType:
+    """Map database Order model to GraphQL OrderType"""
+    # Parse items from JSON to OrderItemType objects
+    order_items = []
+    if order.items:
+        for item_data in order.items:
+            item = OrderItemType(
+                itemId=item_data.get('itemId'),
+                quantity=item_data.get('quantity', 1),
+                customizations=item_data.get('customizations'),
+                note=item_data.get('note')
             )
-        )
+            order_items.append(item)
     
-    return result
-
-# Resolver for getting order history for a user
-def resolve_get_order_history(userId: str, limit: Optional[int] = None, offset: Optional[int] = 0) -> List[OrderType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query completed or cancelled orders for the user
-    query = db.query(Order).filter(
-        Order.user_id == userId,
-        Order.status.in_(["Completed", "Cancelled"])
-    ).order_by(Order.date.desc())
-    
-    # Apply pagination if limit is provided
-    if limit is not None:
-        query = query.offset(offset).limit(limit)
-    
-    order_history = query.all()
-    
-    result = []
-    
-    for order in order_history:
-        # Get order steps
-        steps = db.query(OrderStep).filter(OrderStep.order_id == order.id).all()
-        
-        # Get order items
-        items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-        
-        # Convert to OrderType
-        result.append(
-            OrderType(
-                id=order.id,
-                date=order.date.isoformat() + ".000Z",
-                total=order.total,
-                status=order.status,
-                canteen_name=order.canteen_name,
-                vendor_name=order.vendor_name,
-                estimated_delivery_time=order.estimated_delivery_time,
-                current_status=order.current_status,
-                steps=[
-                    OrderStepType(
-                        status=step.status,
-                        description=step.description,
-                        time=step.time,
-                        completed=bool(step.completed),
-                        current=bool(step.current)
-                    ) for step in steps
-                ],
-                items=[
-                    OrderItemType(
-                        id=str(item.id),
-                        name=item.name,
-                        price=item.price,
-                        quantity=item.quantity,
-                        customizations=json.loads(item.customizations) if item.customizations else [],
-                        vendor_name=item.vendor_name
-                    ) for item in items
-                ]
-            )
-        )
-    
-    return result
-
-# Resolver for getting a specific order by ID
-def resolve_get_order_by_id(orderId: str) -> Optional[OrderType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific order
-    order = db.query(Order).filter(Order.id == orderId).first()
-    
-    if not order:
-        return None
-    
-    # Get order steps
-    steps = db.query(OrderStep).filter(OrderStep.order_id == order.id).all()
-    
-    # Get order items
-    items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
-    
-    # Convert to OrderType
     return OrderType(
         id=order.id,
-        date=order.date.isoformat() + ".000Z",
-        total=order.total,
+        userId=order.userId,
+        canteenId=order.canteenId,
+        items=order_items,
+        totalAmount=order.totalAmount,
         status=order.status,
-        canteen_name=order.canteen_name,
-        vendor_name=order.vendor_name,
-        estimated_delivery_time=order.estimated_delivery_time,
-        current_status=order.current_status,
-        steps=[
-            OrderStepType(
-                status=step.status,
-                description=step.description,
-                time=step.time,
-                completed=bool(step.completed),
-                current=bool(step.current)
-            ) for step in steps
-        ],
-        items=[
-            OrderItemType(
-                id=str(item.id),
-                name=item.name,
-                price=item.price,
-                quantity=item.quantity,
-                customizations=json.loads(item.customizations) if item.customizations else [],
-                vendor_name=item.vendor_name
-            ) for item in items
-        ]
+        orderTime=order.orderTime,
+        confirmedTime=order.confirmedTime,
+        preparingTime=order.preparingTime,
+        readyTime=order.readyTime,
+        deliveryTime=order.deliveryTime,
+        paymentMethod=order.paymentMethod,
+        paymentStatus=order.paymentStatus,
+        customerNote=order.customerNote,
+        discount=order.discount,
+        phone=order.phone,
+        pickupTime=order.pickupTime,
+        isPreOrder=order.isPreOrder,
+        cancelledTime=order.cancelledTime,
+        cancellationReason=order.cancellationReason,
     )
 
-# Create properly decorated fields with resolvers and matching frontend field names
-getActiveOrders = strawberry.field(name="getActiveOrders", resolver=resolve_get_active_orders)
-getOrderHistory = strawberry.field(name="getOrderHistory", resolver=resolve_get_order_history)
-getOrderById = strawberry.field(name="getOrderById", resolver=resolve_get_order_by_id)
+def resolve_get_all_orders(userId: int) -> List[OrderType]:
+    """Get all orders for a user"""
+    db = next(get_db())
+    orders = db.query(Order).filter(Order.userId == userId).order_by(desc(Order.orderTime)).all()
+    return [map_order_to_type(order) for order in orders]
 
+def resolve_get_active_orders(userId: int) -> List[OrderType]:
+    """Get active orders (not delivered or cancelled) for a user"""
+    db = next(get_db())
+    orders = db.query(Order)\
+        .filter(Order.userId == userId)\
+        .filter(Order.status.in_(["pending", "confirmed", "preparing", "ready"]))\
+        .order_by(desc(Order.orderTime))\
+        .all()
+    return [map_order_to_type(order) for order in orders]
+
+def resolve_get_order_by_id(orderId: int) -> Optional[OrderType]:
+    """Get specific order by ID"""
+    db = next(get_db())
+    order = db.query(Order).filter(Order.id == orderId).first()
+    if not order:
+        return None
+    return map_order_to_type(order)
+
+def resolve_get_canteen_orders(canteenId: int) -> List[OrderType]:
+    """Get all orders for a specific canteen"""
+    db = next(get_db())
+    orders = db.query(Order).filter(Order.canteenId == canteenId).order_by(desc(Order.orderTime)).all()
+    return [map_order_to_type(order) for order in orders]
+
+def resolve_get_canteen_active_orders(canteenId: int) -> List[OrderType]:
+    """Get active orders for a specific canteen"""
+    db = next(get_db())
+    orders = db.query(Order)\
+        .filter(Order.canteenId == canteenId)\
+        .filter(Order.status.in_(["pending", "confirmed", "preparing", "ready"]))\
+        .order_by(desc(Order.orderTime))\
+        .all()
+    return [map_order_to_type(order) for order in orders]
+
+# Create properly decorated fields with resolvers
+getAllOrders = strawberry.field(name="getAllOrders", resolver=resolve_get_all_orders)
+getActiveOrders = strawberry.field(name="getActiveOrders", resolver=resolve_get_active_orders)
+getOrderById = strawberry.field(name="getOrderById", resolver=resolve_get_order_by_id)
+getCanteenOrders = strawberry.field(name="getCanteenOrders", resolver=resolve_get_canteen_orders)
+getCanteenActiveOrders = strawberry.field(name="getCanteenActiveOrders", resolver=resolve_get_canteen_active_orders)
+
+# Export the queries
 queries = [
+    getAllOrders,
     getActiveOrders,
-    getOrderHistory,
-    getOrderById
+    getOrderById,
+    getCanteenOrders,
+    getCanteenActiveOrders
 ]

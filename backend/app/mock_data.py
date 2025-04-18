@@ -15,8 +15,8 @@ from app.models.order import Order, OrderItem, OrderStep
 def add_mock_users(db: Session):
     """Add mock users to the database"""
     users = [
-        User(id=1, name="John Doe", email="john@example.com", password="hashedpassword", role="user"),
-        User(id=2, name="Jane Smith", email="jane@example.com", password="hashedpassword", role="user"),
+        User(id="a1b2c3d4-e5f6-7890-abcd-ef1234567890", name="John Doe", email="john@example.com", password="hashedpassword", role="user", favoriteCanteens=[], recentOrders=[]),
+        User(id="b2c3d4e5-f6a7-8901-bcde-f12345678901", name="Jane Smith", email="jane@example.com", password="hashedpassword", role="user", favoriteCanteens=[], recentOrders=[]),
     ]
     
     for user in users:
@@ -30,9 +30,9 @@ def add_mock_users(db: Session):
 def add_mock_canteens(db: Session):
     """Add mock canteens to the database"""
     canteens = [
-        Canteen(id=1, name="Central Canteen", location="Main Building", opening_time="08:00", closing_time="20:00"),
-        Canteen(id=2, name="Library Cafe", location="Library Building", opening_time="09:00", closing_time="18:00"),
-        Canteen(id=3, name="Tech Hub Canteen", location="Technology Block", opening_time="07:30", closing_time="22:00")
+        Canteen(id=1, name="Central Canteen", location="Main Building", openTime="08:00", closeTime="20:00"),
+        Canteen(id=2, name="Library Cafe", location="Library Building", openTime="09:00", closeTime="18:00"),
+        Canteen(id=3, name="Tech Hub Canteen", location="Technology Block", openTime="07:30", closeTime="22:00")
     ]
     
     for canteen in canteens:
@@ -48,28 +48,28 @@ def add_mock_menu_items(db: Session):
     menu_items = [
         MenuItem(
             id=1, name="Paneer Butter Masala", description="Rich and creamy paneer curry",
-            price=180.0, image_url="https://images.unsplash.com/photo-1567188040759-fb8a254b3bd2?q=80&w=300&auto=format&fit=crop",
-            category="Indian Delights", canteen_id=1, is_available=1, is_vegetarian=1, is_featured=1
+            price=180.0, image="https://images.unsplash.com/photo-1567188040759-fb8a254b3bd2?q=80&w=300&auto=format&fit=crop",
+            category="Indian Delights", canteenId=1, isAvailable=True, tags=["Vegetarian"], isPopular=True
         ),
         MenuItem(
             id=2, name="Masala Dosa", description="Crispy crepe filled with spicy potato filling",
-            price=80.0, image_url="https://images.unsplash.com/photo-1589301760014-d929f86731c7?q=80&w=300&auto=format&fit=crop",
-            category="South Indian", canteen_id=1, is_available=1, is_vegetarian=1, is_featured=0
+            price=80.0, image="https://images.unsplash.com/photo-1589301760014-d929f86731c7?q=80&w=300&auto=format&fit=crop",
+            category="South Indian", canteenId=1, isAvailable=True, tags=["Vegetarian"], isPopular=False
         ),
         MenuItem(
             id=3, name="Cold Coffee", description="Refreshing cold coffee with ice cream",
-            price=70.0, image_url="https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?q=80&w=300&auto=format&fit=crop",
-            category="Beverages", canteen_id=2, is_available=1, is_vegetarian=1, is_featured=1
+            price=70.0, image="https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?q=80&w=300&auto=format&fit=crop",
+            category="Beverages", canteenId=2, isAvailable=True, tags=["Vegetarian"], isPopular=True
         ),
         MenuItem(
             id=4, name="Veg Burger", description="Delicious vegetable patty with fresh veggies",
-            price=90.0, image_url="https://images.unsplash.com/photo-1550317138-10000687a72b?q=80&w=300&auto=format&fit=crop",
-            category="Fast Food", canteen_id=3, is_available=1, is_vegetarian=1, is_featured=1
+            price=90.0, image="https://images.unsplash.com/photo-1550317138-10000687a72b?q=80&w=300&auto=format&fit=crop",
+            category="Fast Food", canteenId=3, isAvailable=True, tags=["Vegetarian"], isPopular=True
         ),
         MenuItem(
             id=5, name="French Fries", description="Crispy potato fries with seasoning",
-            price=60.0, image_url="https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?q=80&w=300&auto=format&fit=crop",
-            category="Fast Food", canteen_id=3, is_available=1, is_vegetarian=1, is_featured=0
+            price=60.0, image="https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?q=80&w=300&auto=format&fit=crop",
+            category="Fast Food", canteenId=3, isAvailable=True, tags=["Vegetarian"], isPopular=False
         ),
     ]
     
@@ -84,62 +84,50 @@ def add_mock_menu_items(db: Session):
 def add_mock_cart_data(db: Session):
     """Add mock cart data to the database"""
     # Create cart for user 1
-    cart1 = db.query(Cart).filter(Cart.user_id == 1).first()
+    cart1 = db.query(Cart).filter(Cart.userId == "a1b2c3d4-e5f6-7890-abcd-ef1234567890").first()
     if not cart1:
         cart1 = Cart(
-            user_id=1,
-            created_at=datetime.datetime.utcnow().isoformat(),
-            updated_at=datetime.datetime.utcnow().isoformat()
+            userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            createdAt=datetime.datetime.utcnow().isoformat(),
+            updatedAt=datetime.datetime.utcnow().isoformat()
         )
         db.add(cart1)
         db.flush()  # Get the ID without committing
     
     # Clear any existing cart items for this cart
-    db.query(CartItem).filter(CartItem.cart_id == cart1.id).delete()
+    db.query(CartItem).filter(CartItem.cartId == cart1.id).delete()
     
     # Add items to cart 1
     cart_items = [
         CartItem(
-            cart_id=cart1.id,
-            menu_item_id=1,
-            name="Paneer Butter Masala",
-            price=180.0,
+            cartId=cart1.id,
+            menuItemId=1,
             quantity=1,
-            customizations=json.dumps({
+            selectedExtras=json.dumps({
                 "Spice Level": "Medium",
                 "Extra Paneer": True
             }),
-            image="https://images.unsplash.com/photo-1567188040759-fb8a254b3bd2?q=80&w=300&auto=format&fit=crop",
-            description="Rich and creamy paneer curry",
-            vendor_name="Indian Delights"
+            specialInstructions="Extra spicy"
         ),
         CartItem(
-            cart_id=cart1.id,
-            menu_item_id=3,
-            name="Cold Coffee",
-            price=70.0,
+            cartId=cart1.id,
+            menuItemId=3,
             quantity=2,
-            customizations=json.dumps({
+            selectedExtras=json.dumps({
                 "Sugar": "Less",
                 "Ice": "Regular"
             }),
-            image="https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?q=80&w=300&auto=format&fit=crop",
-            description="Refreshing cold coffee with ice cream",
-            vendor_name="Beverages"
+            specialInstructions="Extra cold"
         ),
         CartItem(
-            cart_id=cart1.id,
-            menu_item_id=4,
-            name="Veg Burger",
-            price=90.0,
+            cartId=cart1.id,
+            menuItemId=4,
             quantity=1,
-            customizations=json.dumps({
+            selectedExtras=json.dumps({
                 "Extra Cheese": True,
                 "No Onion": True
             }),
-            image="https://images.unsplash.com/photo-1550317138-10000687a72b?q=80&w=300&auto=format&fit=crop",
-            description="Delicious vegetable patty with fresh veggies",
-            vendor_name="Fast Food"
+            specialInstructions="Well done"
         )
     ]
     
@@ -147,47 +135,39 @@ def add_mock_cart_data(db: Session):
         db.add(item)
     
     # Create cart for user 2
-    cart2 = db.query(Cart).filter(Cart.user_id == 2).first()
+    cart2 = db.query(Cart).filter(Cart.userId == "b2c3d4e5-f6a7-8901-bcde-f12345678901").first()
     if not cart2:
         cart2 = Cart(
-            user_id=2,
-            created_at=datetime.datetime.utcnow().isoformat(),
-            updated_at=datetime.datetime.utcnow().isoformat()
+            userId="b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            createdAt=datetime.datetime.utcnow().isoformat(),
+            updatedAt=datetime.datetime.utcnow().isoformat()
         )
         db.add(cart2)
         db.flush()  # Get the ID without committing
     
     # Clear any existing cart items for this cart
-    db.query(CartItem).filter(CartItem.cart_id == cart2.id).delete()
+    db.query(CartItem).filter(CartItem.cartId == cart2.id).delete()
     
     # Add items to cart 2
     cart_items = [
         CartItem(
-            cart_id=cart2.id,
-            menu_item_id=2,
-            name="Masala Dosa",
-            price=80.0,
+            cartId=cart2.id,
+            menuItemId=2,
             quantity=2,
-            customizations=json.dumps({
+            selectedExtras=json.dumps({
                 "Extra Chutney": True
             }),
-            image="https://images.unsplash.com/photo-1589301760014-d929f86731c7?q=80&w=300&auto=format&fit=crop",
-            description="Crispy crepe filled with spicy potato filling",
-            vendor_name="South Indian"
+            specialInstructions="Extra crispy"
         ),
         CartItem(
-            cart_id=cart2.id,
-            menu_item_id=5,
-            name="French Fries",
-            price=60.0,
+            cartId=cart2.id,
+            menuItemId=5,
             quantity=1,
-            customizations=json.dumps({
+            selectedExtras=json.dumps({
                 "Extra Salt": True,
                 "Sauce": "Ketchup"
             }),
-            image="https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?q=80&w=300&auto=format&fit=crop",
-            description="Crispy potato fries with seasoning",
-            vendor_name="Fast Food"
+            specialInstructions="Extra crispy"
         )
     ]
     
@@ -206,23 +186,24 @@ def add_mock_orders(db: Session):
     
     # Active order for current date (April 17, 2025)
     active_order = Order(
-        id="ORD12345",
-        user_id=1,
-        date=datetime.datetime.strptime("2025-04-16T12:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
-        total=450.00,
+        userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        canteenId=1,
+        totalAmount=450.00,
         status="Processing",
-        canteen_name="Central Canteen",
-        vendor_name="Indian Delights",
-        estimated_delivery_time="12:45 PM",
-        current_status="Preparing"
+        orderTime=datetime.datetime.strptime("2025-04-16T12:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ").isoformat(),
+        paymentMethod="Card",
+        paymentStatus="Paid",
+        phone="1234567890",
+        pickupTime="12:45 PM",
+        isPreOrder=False
     )
     db.add(active_order)
     db.flush()
-    
+
     # Order steps for active order
     order_steps = [
         OrderStep(
-            order_id=active_order.id,
+            orderId=active_order.id,
             status="Order Placed",
             description="Your order has been received by the vendor.",
             time="12:15 PM",
@@ -230,7 +211,7 @@ def add_mock_orders(db: Session):
             current=0
         ),
         OrderStep(
-            order_id=active_order.id,
+            orderId=active_order.id,
             status="Preparing",
             description="The kitchen is preparing your food.",
             time="12:20 PM",
@@ -238,7 +219,7 @@ def add_mock_orders(db: Session):
             current=1
         ),
         OrderStep(
-            order_id=active_order.id,
+            orderId=active_order.id,
             status="Ready for Pickup",
             description="Your order is ready for pickup.",
             time="",
@@ -246,7 +227,7 @@ def add_mock_orders(db: Session):
             current=0
         ),
         OrderStep(
-            order_id=active_order.id,
+            orderId=active_order.id,
             status="Completed",
             description="Your order has been picked up.",
             time="",
@@ -260,170 +241,154 @@ def add_mock_orders(db: Session):
     # Order items for active order
     order_items = [
         OrderItem(
-            order_id=active_order.id,
-            menu_item_id=1,
-            name="Butter Chicken",
-            price=220.00,
+            orderId=active_order.id,
+            itemId=1,
             quantity=1,
             customizations=json.dumps(["Extra Butter", "Medium Spicy"]),
-            vendor_name="Indian Delights"
+            note="Make it extra creamy"
         ),
         OrderItem(
-            order_id=active_order.id,
-            menu_item_id=2,
-            name="Garlic Naan",
-            price=40.00,
+            orderId=active_order.id,
+            itemId=2,
             quantity=2,
             customizations=json.dumps([]),
-            vendor_name="Indian Delights"
+            note=""
         ),
         OrderItem(
-            order_id=active_order.id,
-            menu_item_id=3,
-            name="Jeera Rice",
-            price=150.00,
+            orderId=active_order.id,
+            itemId=3,
             quantity=1,
             customizations=json.dumps(["Large Portion"]),
-            vendor_name="Indian Delights"
+            note=""
         )
     ]
     for item in order_items:
         db.add(item)
     
     # Order history
-    order_history = [
-        Order(
-            id="ORD12344",
-            user_id=1,
-            date=datetime.datetime.strptime("2025-04-12T15:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
-            total=320.00,
-            status="Completed",
-            canteen_name="Central Canteen",
-            vendor_name="Indian Delights"
-        ),
-        Order(
-            id="ORD12343",
-            user_id=1,
-            date=datetime.datetime.strptime("2025-04-10T13:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
-            total=280.00,
-            status="Completed",
-            canteen_name="South Campus Cafeteria",
-            vendor_name="Sandwich King"
-        ),
-        Order(
-            id="ORD12340",
-            user_id=1,
-            date=datetime.datetime.strptime("2025-04-05T19:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"),
-            total=520.00,
-            status="Cancelled",
-            canteen_name="North Block Canteen",
-            vendor_name="Chinese Corner"
-        )
-    ]
+    order_history1 = Order(
+        userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        canteenId=1,
+        totalAmount=320.00,
+        status="Completed",
+        orderTime=datetime.datetime.strptime("2025-04-12T15:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ").isoformat(),
+        paymentMethod="Card",
+        paymentStatus="Paid",
+        phone="1234567890",
+        isPreOrder=False
+    )
+    db.add(order_history1)
+    db.flush()
     
-    # Add order history
-    for order in order_history:
-        db.add(order)
+    order_history2 = Order(
+        userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        canteenId=2,
+        totalAmount=280.00,
+        status="Completed",
+        orderTime=datetime.datetime.strptime("2025-04-10T13:15:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ").isoformat(),
+        paymentMethod="Card",
+        paymentStatus="Paid",
+        phone="1234567890",
+        isPreOrder=False
+    )
+    db.add(order_history2)
+    db.flush()
+    
+    order_history3 = Order(
+        userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        canteenId=3,
+        totalAmount=520.00,
+        status="Cancelled",
+        orderTime=datetime.datetime.strptime("2025-04-05T19:30:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ").isoformat(),
+        cancelledTime=datetime.datetime.strptime("2025-04-05T19:40:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ").isoformat(),
+        cancellationReason="Changed my mind",
+        paymentMethod="Cash",
+        paymentStatus="Refunded",
+        phone="1234567890",
+        isPreOrder=False
+    )
+    db.add(order_history3)
+    db.flush()
     
     # Add items for first history order
     history_items1 = [
         OrderItem(
-            order_id="ORD12344",
-            menu_item_id=1,
-            name="Paneer Butter Masala",
-            price=180.00,
+            orderId=order_history1.id,
+            itemId=1,
             quantity=1,
             customizations=json.dumps(["Extra Spicy", "Regular Portion"]),
-            vendor_name="Indian Delights"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12344",
-            menu_item_id=2,
-            name="Garlic Naan",
-            price=40.00,
+            orderId=order_history1.id,
+            itemId=2,
             quantity=2,
             customizations=json.dumps([]),
-            vendor_name="Indian Delights"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12344",
-            menu_item_id=3,
-            name="Sweet Lassi",
-            price=60.00,
+            orderId=order_history1.id,
+            itemId=3,
             quantity=1,
             customizations=json.dumps([]),
-            vendor_name="Indian Delights"
+            note=""
         )
     ]
     
     # Add items for second history order
     history_items2 = [
         OrderItem(
-            order_id="ORD12343",
-            menu_item_id=4,
-            name="Grilled Chicken Club Sandwich",
-            price=150.00,
+            orderId=order_history2.id,
+            itemId=4,
             quantity=1,
             customizations=json.dumps(["No Onions", "Extra Cheese"]),
-            vendor_name="Sandwich King"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12343",
-            menu_item_id=5,
-            name="French Fries",
-            price=80.00,
+            orderId=order_history2.id,
+            itemId=5,
             quantity=1,
             customizations=json.dumps(["Extra Salt"]),
-            vendor_name="Sandwich King"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12343",
-            menu_item_id=3,
-            name="Chocolate Shake",
-            price=50.00,
+            orderId=order_history2.id,
+            itemId=3,
             quantity=1,
             customizations=json.dumps([]),
-            vendor_name="Sandwich King"
+            note=""
         )
     ]
     
     # Add items for third history order
     history_items3 = [
         OrderItem(
-            order_id="ORD12340",
-            menu_item_id=1,
-            name="Hakka Noodles",
-            price=160.00,
+            orderId=order_history3.id,
+            itemId=1,
             quantity=1,
             customizations=json.dumps(["Extra Veggies"]),
-            vendor_name="Chinese Corner"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12340",
-            menu_item_id=2,
-            name="Chilli Paneer",
-            price=180.00,
+            orderId=order_history3.id,
+            itemId=2,
             quantity=1,
             customizations=json.dumps(["Dry", "Extra Spicy"]),
-            vendor_name="Chinese Corner"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12340",
-            menu_item_id=3,
-            name="Veg Spring Rolls",
-            price=120.00,
+            orderId=order_history3.id,
+            itemId=3,
             quantity=1,
             customizations=json.dumps([]),
-            vendor_name="Chinese Corner"
+            note=""
         ),
         OrderItem(
-            order_id="ORD12340",
-            menu_item_id=4,
-            name="Fried Rice",
-            price=60.00,
+            orderId=order_history3.id,
+            itemId=4,
             quantity=1,
             customizations=json.dumps(["No Eggs"]),
-            vendor_name="Chinese Corner"
+            note=""
         )
     ]
     

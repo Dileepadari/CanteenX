@@ -1,16 +1,27 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class MenuItem(Base):
     __tablename__ = "menu_items"
+    
     id = Column(Integer, primary_key=True, index=True)
+    canteenId = Column(Integer, ForeignKey("canteens.id"))
+    canteenName = Column(String)
     name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
+    description = Column(String)
     price = Column(Float, nullable=False)
-    image_url = Column(String, nullable=True)
-    category = Column(String, nullable=True)
-    canteen_id = Column(Integer, ForeignKey("canteens.id"))
-    is_available = Column(Integer, default=1)  # 1 for available, 0 for unavailable
-    is_vegetarian = Column(Integer, default=0)  # 1 for vegetarian, 0 for non-vegetarian
-    is_featured = Column(Integer, default=0)  # 1 for featured, 0 for non-featured
+    category = Column(String)
+    image = Column(String)
+    tags = Column(JSON)  # Store as JSON array
+    rating = Column(Float, default=0.0)
+    ratingCount = Column(Integer, default=0)
+    isAvailable = Column(Boolean, default=True)
+    preparationTime = Column(Integer)  # in minutes
+    isPopular = Column(Boolean, default=False)
+    customizationOptions = Column(JSON)  # Store as JSON object
+    
+    # Relationships
+    canteen = relationship("Canteen", back_populates="menuItems")
+    # Removed orderItems relationship since we're using JSON for order items
+

@@ -1,75 +1,95 @@
 import strawberry
-import json
 import datetime
+import json
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+
 
 from app.models.cart import Cart, CartItem
 from app.core.database import get_db
 
+import strawberry
+from typing import Optional, List
+from datetime import datetime
+
+
 @strawberry.type
 class CartItemType:
     id: int
-    menu_item_id: int
-    name: str
-    price: float
+    cartId: int
+    menuItemId: int
     quantity: int
-    customizations: Optional[str]
-    image: Optional[str]
-    description: Optional[str]
-    vendor_name: Optional[str]
+    selectedSize: Optional[str] = None  # Changed to string to store the selected size name
+    selectedExtras: Optional[str] = None  # Changed to list of strings for selected extras
+    specialInstructions: Optional[str] = None
+    location: Optional[str] = None
 
 @strawberry.type
 class CartType:
     id: int
-    user_id: str
-    created_at: str
-    updated_at: str
-    items: List[CartItemType]
+    userId: int
+    createdAt: str  # ISO format string
+    updatedAt: str  # ISO format string
+    pickupDate: Optional[str]
+    pickupTime: Optional[str]
+    items: Optional[List[CartItemType]] = None  # if you're resolving related items
 
-def resolve_get_cart_items(user_id: int) -> CartType:
-    """Get cart items for a user from the database"""
+def resolve_get_cart_by_user_id(userId: int) -> Optional[CartType]:
     # Get database session
     db = next(get_db())
     
-    # Get or create cart
-    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
+    # Query for the cart associated with the user
+    cart = db.query(Cart).filter(Cart.userId == userId).first()
     
     if not cart:
-        # Create a new cart if none exists
-        now = datetime.datetime.utcnow().isoformat()
-        cart = Cart(user_id=user_id, created_at=now, updated_at=now)
-        db.add(cart)
-        db.commit()
-        db.refresh(cart)
+        return None
     
-    # Get cart items
-    cart_items = db.query(CartItem).filter(CartItem.cart_id == cart.id).all()
+    # Query for cart items
+    cart_items = db.query(CartItem).filter(CartItem.cartId == cart.id).all()
     
+    # Convert cart items to CartItemType objects
+    cart_items_types = []
+    for item in cart_items:
+        # Handle selectedSize - convert from dict/JSON to string if needed
+        selected_size = item.selectedSize
+        if selected_size is not None:
+            try:
+                selected_size = json.dumps(selected_size)
+            except Exception:
+                selected_size = None
+                
+        # Handle selectedExtras - convert from dict/JSON to list of strings if needed
+        selected_extras = item.selectedExtras
+        if selected_extras is not None:
+            try:
+                selected_extras = json.dumps(selected_extras)
+            except Exception:
+                selected_extras = None
+        
+        cart_items_types.append(CartItemType(
+            id=item.id,
+            cartId=item.cartId,
+            menuItemId=item.menuItemId,
+            quantity=item.quantity,
+            selectedSize=selected_size,
+            selectedExtras=selected_extras,
+            specialInstructions=item.specialInstructions,
+            location=item.location
+        ))
+    
+    # Create and return CartType with all items
     return CartType(
         id=cart.id,
-        user_id=cart.user_id,
-        created_at=cart.created_at,
-        updated_at=cart.updated_at,
-        items=[
-            CartItemType(
-                id=item.id,
-                menu_item_id=item.menu_item_id,
-                name=item.name,
-                price=item.price,
-                quantity=item.quantity,
-                customizations=item.customizations,
-                image=item.image,
-                description=item.description,
-                vendor_name=item.vendor_name
-            ) 
-            for item in cart_items
-        ]
+        userId=cart.userId,
+        createdAt=cart.createdAt,
+        updatedAt=cart.updatedAt,
+        pickupDate=cart.pickupDate.isoformat() if cart.pickupDate else None,
+        pickupTime=cart.pickupTime if cart.pickupTime else None,
+        items=cart_items_types
     )
 
-# Create GraphQL fields
-getCartItems = strawberry.field(name="getCartItems", resolver=resolve_get_cart_items)
+# Create properly decorated field with resolver
+getCartByUserId = strawberry.field(name="getCartByUserId", resolver=resolve_get_cart_by_user_id)
 
-# Export queries and mutations
-queries = [getCartItems]
+queries = [
+    getCartByUserId
+]
