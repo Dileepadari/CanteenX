@@ -9,6 +9,7 @@ from app.services import queries
 from app.services.auth import Mutation
 from app.core.database import Base, engine
 from app.models import user
+from app.queries import queries
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,7 +26,6 @@ async def get_context(request: Request, response: Response):
 Query = create_type("Query", queries)
 graphql_schema = strawberry.Schema(query=Query, mutation=Mutation)
 graphql_app = GraphQLRouter(schema=graphql_schema, context_getter = get_context)
-
 app = FastAPI()
 
 # GraphQL endpoint
