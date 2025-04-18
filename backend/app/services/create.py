@@ -13,8 +13,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @strawberry.type
 class UserType:
-    id: int
-    username: str
+    id: str
+    name: str
     email: str
     password: str
     role: str

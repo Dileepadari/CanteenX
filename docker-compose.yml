@@ -39,10 +39,13 @@ services:
 
   nginx:
     image: nginx:latest
+    container_name: nginx
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl  # Mount SSL certificates
     ports:
       - "80:80"
+      - "443:443"  # Expose HTTPS
     depends_on:
       - frontend
       - backend

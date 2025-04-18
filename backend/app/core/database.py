@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from app.core.base import Base  # Import Base from the new module
 
 # SQLite connection URL
 SQLALCHEMY_DATABASE_URL = "sqlite:///./smart_canteen.db"
@@ -12,9 +12,6 @@ engine = create_engine(
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create declarative base for models
-Base = declarative_base()
 
 # Dependency to get DB session
 def get_db():

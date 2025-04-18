@@ -15,8 +15,8 @@ from app.models.order import Order, OrderItem, OrderStep
 def add_mock_users(db: Session):
     """Add mock users to the database"""
     users = [
-        User(id=1, name="John Doe", email="john@example.com"),
-        User(id=2, name="Jane Smith", email="jane@example.com"),
+        User(id=1, name="John Doe", email="john@example.com", password="hashedpassword", role="user"),
+        User(id=2, name="Jane Smith", email="jane@example.com", password="hashedpassword", role="user"),
     ]
     
     for user in users:
