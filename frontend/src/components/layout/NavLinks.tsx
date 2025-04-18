@@ -32,7 +32,6 @@ const NavLinks: React.FC<NavLinksProps> = ({ isVendor = false, isMobile = false,
     { path: "/", label: "Home", icon: <Home className={iconClasses} /> },
     { path: "/canteens", label: "Canteens", icon: <Store className={iconClasses} /> },
     { path: "/menu", label: "Menu", icon: <MenuSquare className={iconClasses} /> },
-    { path: '/orders', label: 'Orders', icon: <ClipboardList size={18} /> },
   ];
 
   const vendorLinks = [
