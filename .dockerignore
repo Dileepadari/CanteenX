@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+*.log
+*.env
+.git
+.gitignore
+Dockerfile
+.dockerignore
+.vscode
+__pycache__
+*.pyc
