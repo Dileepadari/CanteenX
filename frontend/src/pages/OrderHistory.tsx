@@ -1,6 +1,6 @@
 
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { orders, menuItems, canteens, orderStatusOptions } from "@/data/mockData";
 import OrderStatusBadge from "@/components/order/OrderStatusBadge";
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronRight, Clock, Repeat, Receipt } from "lucide-react";
 
 const OrderHistory = () => {
+  const navigate = useNavigate();
+  
   // Helper function to find menu item by id
   const findMenuItem = (itemId: number) => {
     return menuItems.find((item) => item.id === itemId);
@@ -37,6 +39,14 @@ const OrderHistory = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // Handler for reordering
+  const handleReorder = (orderId: number) => {
+    // In a real implementation, this would copy the order items to the cart
+    // and navigate to the checkout page
+    alert(`Reordering order #${orderId}`);
+    navigate("/menu");
   };
 
   // Active orders (preparing, ready)
@@ -214,7 +224,12 @@ const OrderHistory = () => {
 
                           {/* Action buttons */}
                           <div className="bg-gray-50 p-4 flex flex-row sm:flex-col justify-between items-center gap-2 sm:border-l border-gray-100">
-                            <Button variant="outline" size="sm" className="w-full gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full gap-1"
+                              onClick={() => handleReorder(order.id)}
+                            >
                               <Repeat className="h-4 w-4" />
                               Reorder
                             </Button>

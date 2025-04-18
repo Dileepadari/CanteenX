@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
   ClipboardList, 
@@ -9,11 +9,13 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  Bell
+  Package,
+  Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import VendorNotifications from '../notification/VendorNotifications';
 
 interface VendorLayoutProps {
   children: React.ReactNode;
@@ -21,6 +23,7 @@ interface VendorLayoutProps {
 
 const VendorLayout = ({ children }: VendorLayoutProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
 
   const handleLogout = () => {
@@ -34,6 +37,7 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
   const navItems = [
     { icon: Home, label: 'Dashboard', path: '/vendor/dashboard' },
     { icon: ClipboardList, label: 'Orders', path: '/vendor/orders' },
+    { icon: Package, label: 'Bulk Orders', path: '/vendor/bulk-orders' },
     { icon: Utensils, label: 'Menu', path: '/vendor/menu' },
     { icon: Tag, label: 'Promotions', path: '/vendor/promotions' },
     { icon: BarChart3, label: 'Analytics', path: '/vendor/analytics' },
@@ -57,7 +61,11 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
             <Link
               key={item.path}
               to={item.path}
-              className="flex items-center px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100"
+              className={`flex items-center px-3 py-2 rounded-md ${
+                location.pathname === item.path
+                  ? 'bg-canteen-orange/10 text-canteen-orange'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
             >
               <item.icon className="h-5 w-5 mr-3" />
               {item.label}
@@ -81,15 +89,12 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Vendor Dashboard</h1>
+          <h1 className="text-2xl font-bold">
+            {navItems.find(item => item.path === location.pathname)?.label || 'Vendor Dashboard'}
+          </h1>
 
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center rounded-full bg-canteen-orange text-white text-xs">
-                3
-              </span>
-            </Button>
+            <VendorNotifications />
           </div>
         </header>
 

@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 
 type NotificationType = "default" | "success" | "warning" | "error" | "info";
@@ -29,6 +29,9 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+// Local storage key for persistent notifications
+const STORAGE_KEY = "smart_canteen_notifications";
+
 export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (!context) {
@@ -38,7 +41,34 @@ export const useNotification = () => {
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  // Load notifications from local storage on initial render
+  const loadSavedNotifications = (): Notification[] => {
+    try {
+      const savedNotifications = localStorage.getItem(STORAGE_KEY);
+      if (savedNotifications) {
+        const parsed = JSON.parse(savedNotifications);
+        // Convert string dates back to Date objects
+        return parsed.map((notification: any) => ({
+          ...notification,
+          date: new Date(notification.date)
+        }));
+      }
+    } catch (error) {
+      console.error("Error loading notifications from storage:", error);
+    }
+    return [];
+  };
+
+  const [notifications, setNotifications] = useState<Notification[]>(loadSavedNotifications());
+
+  // Save notifications to local storage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+    } catch (error) {
+      console.error("Error saving notifications to storage:", error);
+    }
+  }, [notifications]);
 
   const unreadCount = notifications.filter(notification => !notification.read).length;
 

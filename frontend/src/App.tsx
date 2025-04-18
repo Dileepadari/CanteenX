@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +11,8 @@ import Canteens from "./pages/Canteens";
 import CanteenDetails from "./pages/CanteenDetails";
 import Menu from "./pages/Menu";
 import OrderHistory from "./pages/OrderHistory";
+import OrderDetails from "./pages/OrderDetails";
+import OrderTracking from "./pages/OrderTracking";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
@@ -19,8 +22,9 @@ import Feedback from "./pages/Feedback";
 import VendorOrders from "./pages/vendor/VendorOrders";
 import VendorMenu from "./pages/vendor/VendorMenu";
 import VendorPromotions from "./pages/vendor/VendorPromotions";
-// import VendorAnalytics from "./pages/vendor/VendorAnalytics";
-// import VendorSettings from "./pages/vendor/VendorSettings";
+import VendorAnalytics from "./pages/vendor/VendorAnalytics";
+import VendorSettings from "./pages/vendor/VendorSettings";
+import VendorBulkOrders from "./pages/vendor/VendorBulkOrders";
 
 import { GqlProvider } from "./gql/gqlClient";
 
@@ -36,21 +40,29 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <Routes>
+                {/* User Pages */}
                 <Route path="/" element={<Index />} />
                 <Route path="/canteens" element={<Canteens />} />
                 <Route path="/canteen/:id" element={<CanteenDetails />} />
                 <Route path="/menu" element={<Menu />} />
                 <Route path="/orders" element={<OrderHistory />} />
+                <Route path="/orders/:id" element={<OrderDetails />} />
+                <Route path="/orders/track/:id" element={<OrderTracking />} />
                 <Route path="/pre-order" element={<PreOrder />} />
                 <Route path="/feedback" element={<Feedback />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/profile" element={<Profile />} />
+                
+                {/* Vendor Pages */}
                 <Route path="/vendor/dashboard" element={<VendorDashboard />} />
                 <Route path="/vendor/orders" element={<VendorOrders />} />
                 <Route path="/vendor/menu" element={<VendorMenu />} />
                 <Route path="/vendor/promotions" element={<VendorPromotions />} />
-                {/* <Route path="/vendor/analytics" element={<VendorAnalytics />} />
-                <Route path="/vendor/settings" element={<VendorSettings />} /> */}
+                <Route path="/vendor/analytics" element={<VendorAnalytics />} />
+                <Route path="/vendor/settings" element={<VendorSettings />} />
+                <Route path="/vendor/bulk-orders" element={<VendorBulkOrders />} />
+                
+                {/* Not Found */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

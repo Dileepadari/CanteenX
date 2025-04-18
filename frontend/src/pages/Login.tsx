@@ -124,7 +124,7 @@ const Login = () => {
         description: `Welcome back, ${mockUser.name}!`,
       });
       
-      navigate(-1);
+      navigate('/');
     }, 3000);
   };
 
