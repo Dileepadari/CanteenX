@@ -3,8 +3,10 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <div className="relative bg-gradient-to-r from-canteen-blue to-canteen-orange text-white">
       <div className="absolute inset-0 bg-black/20"></div>
@@ -30,10 +32,10 @@ const HeroSection: React.FC = () => {
           </div>
 
           <div className="flex justify-center mt-8 space-x-4">
-            <Button variant="secondary" size="lg">
+            <Button variant="secondary" size="lg" onClick={() => navigate("/canteens")}>
               View Canteens
             </Button>
-            <Button variant="outline" size="lg" className="bg-white/10 hover:bg-white/20 text-white border-white">
+            <Button variant="outline" size="lg" className="bg-white/10 hover:bg-white/20 text-white border-white" onClick={() => navigate("#how-it-works")}>
               How It Works
             </Button>
           </div>

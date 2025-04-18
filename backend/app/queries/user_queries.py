@@ -3,14 +3,7 @@ from typing import List, Optional
 from app.models.user import User
 from app.core.database import get_db
 from app.models.order import Order
-
-@strawberry.type
-class UserType:
-    id: int
-    name: str
-    email: str
-    profile_picture: Optional[str] = None
-    preferred_payment: Optional[str] = None
+from app.models.user_types import UserType  # Import from a central location
 
 @strawberry.type
 class UserProfileType:
@@ -38,7 +31,7 @@ def resolve_get_users() -> List[UserType]:
         for user in users
     ]
 
-def resolve_get_user_by_id(user_id: int) -> Optional[UserType]:
+def resolve_get_user_by_id(user_id: str) -> Optional[UserType]:
     # Get database session
     db = next(get_db())
     
@@ -57,7 +50,7 @@ def resolve_get_user_by_id(user_id: int) -> Optional[UserType]:
         preferred_payment="Credit Card" if user.id == 1 else ("Mobile Payment" if user.id == 2 else None)
     )
 
-def resolve_get_user_profile(user_id: int) -> Optional[UserProfileType]:
+def resolve_get_user_profile(user_id: str) -> Optional[UserProfileType]:
     # Get database session
     db = next(get_db())
     
