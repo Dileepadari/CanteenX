@@ -9,7 +9,7 @@ import strawberry
 class Cart(Base):
     __tablename__ = "carts"
     id = Column(Integer, primary_key=True, index=True)
-    userId = Column(Integer, ForeignKey("users.id"))
+    userId = Column(String, ForeignKey("users.id"))
     items = Column(JSON)  # Store as JSON array
     totalAmount = Column(Float, default=0)
     canteenId = Column(Integer, ForeignKey("canteens.id"))

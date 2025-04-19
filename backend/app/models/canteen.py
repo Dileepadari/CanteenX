@@ -20,8 +20,9 @@ class Canteen(Base):
     schedule = Column(JSON)  # Changed to generic JSON for SQLite compatibility
     tags = Column(JSON)  # Changed to generic JSON for SQLite compatibility
     
-    userId = Column(Integer, ForeignKey("users.id"), nullable=True)
-    
+    userId = Column(String, ForeignKey("users.id"), nullable=True)
+    merchant = relationship("Merchant", back_populates="canteen", uselist=False)
+        
     # Relationships
     menuItems = relationship("MenuItem", back_populates="canteen")
     orders = relationship("Order", back_populates="canteen")

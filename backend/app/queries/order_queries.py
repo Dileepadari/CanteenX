@@ -5,13 +5,7 @@ from app.models.order import OrderItem, Order
 from app.core.database import get_db
 from sqlalchemy import desc, func
 from datetime import datetime
-
-@strawberry.input
-class CustomizationsInput:
-    size: Optional[str] = None
-    additions: Optional[List[str]] = None
-    removals: Optional[List[str]] = None
-    notes: Optional[str] = None
+from app.schemas.common import CustomizationsInput, CustomizationsResponse
 
 @strawberry.type
 class Customizations:
@@ -31,7 +25,7 @@ class OrderItemType:
 @strawberry.type
 class OrderType:
     id: int
-    userId: int
+    userId: str
     canteenId: int
     items: List[OrderItemType]  # List of OrderItemType objects
     totalAmount: float
@@ -61,16 +55,37 @@ def map_order_to_type(order: Order) -> OrderType:
             if item_data.get('customizations'):
                 try:
                     customizations_dict = item_data.get('customizations')
+                    # Handle the case where customizations is a string
                     if isinstance(customizations_dict, str):
-                        customizations_dict = json.loads(customizations_dict)
-                    customizations_obj = Customizations(
-                        size=customizations_dict.get("size"),
-                        additions=customizations_dict.get("additions"),
-                        removals=customizations_dict.get("removals"),
-                        notes=customizations_dict.get("notes"),
-                    )
+                        try:
+                            customizations_dict = json.loads(customizations_dict)
+                        except Exception:
+                            # If parsing fails, initialize as empty dict
+                            customizations_dict = {}
+                            
+                    # Only proceed if we have a dict
+                    if isinstance(customizations_dict, dict):
+                        customizations_obj = Customizations(
+                            size=customizations_dict.get("size"),
+                            additions=customizations_dict.get("additions"),
+                            removals=customizations_dict.get("removals"),
+                            notes=customizations_dict.get("notes"),
+                        )
+                    else:
+                        # Fallback for non-dict customizations
+                        customizations_obj = Customizations(
+                            size=None,
+                            additions=None,
+                            removals=None,
+                            notes=None,
+                        )
                 except Exception:
-                    customizations_obj = None
+                    customizations_obj = Customizations(
+                        size=None,
+                        additions=None,
+                        removals=None,
+                        notes=None,
+                    )
 
             item = OrderItemType(
                 id=item_data.get('id'),
@@ -104,13 +119,13 @@ def map_order_to_type(order: Order) -> OrderType:
         cancellationReason=order.cancellationReason,
     )
 
-def resolve_get_all_orders(userId: int) -> List[OrderType]:
+def resolve_get_all_orders(userId: str) -> List[OrderType]:
     """Get all orders for a user"""
     db = next(get_db())
     orders = db.query(Order).filter(Order.userId == userId).order_by(desc(Order.orderTime)).all()
     return [map_order_to_type(order) for order in orders]
 
-def resolve_get_active_orders(userId: int) -> List[OrderType]:
+def resolve_get_active_orders(userId: str) -> List[OrderType]:
     """Get active orders (not delivered or cancelled) for a user"""
     db = next(get_db())
     orders = db.query(Order)\

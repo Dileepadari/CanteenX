@@ -2,11 +2,11 @@
  * GraphQL mutations related to orders
  */
 
-import { gql } from "graphql-tag";
+import { gql } from "@apollo/client";
 
 export const CREATE_ORDER = gql`
   mutation CreateOrder(
-    $userId: Int!,
+    $userId: String!,
     $canteenId: Int!,
     $items: [OrderItemInput!]!,
     $paymentMethod: String!,
@@ -40,7 +40,7 @@ export const UPDATE_ORDER_STATUS = gql`
   mutation UpdateOrderStatus(
     $orderId: Int!,
     $status: String!,
-    $currentUserId: Int!
+    $currentUserId: String!
   ) {
     updateOrderStatus(
       orderId: $orderId,
@@ -59,7 +59,7 @@ export const UPDATE_ORDER_STATUS = gql`
  */
 export const PLACE_SCHEDULED_ORDER = gql`
   mutation PlaceScheduledOrder(
-    $userId: Int!,
+    $userId: String!,
     $canteenId: Int!,
     $items: [OrderItemInput!]!,
     $subtotal: Float!,
@@ -120,13 +120,13 @@ export const UPDATE_ORDER = gql`
  */
 export const CANCEL_ORDER = gql`
   mutation CancelOrder(
+    $userId: String!,
     $orderId: Int!,
-    $userId: Int!,
-    $reason: String!
+    $reason: String
   ) {
     cancelOrder(
-      orderId: $orderId,
       userId: $userId,
+      orderId: $orderId,
       reason: $reason
     ) {
       success
@@ -144,7 +144,7 @@ export const UPDATE_PAYMENT_STATUS = gql`
   mutation UpdatePaymentStatus(
     $orderId: Int!,
     $paymentStatus: String!,
-    $currentUserId: Int!
+    $currentUserId: String!
   ) {
     updatePaymentStatus(
       orderId: $orderId,
@@ -175,86 +175,43 @@ export const UPDATE_ORDER_PREPARATION_TIME = gql`
   }
 `;
 
+// Fix queries to use String type for userId
 export const GET_ALL_ORDERS_OF_USER = gql`
-query GetAllOrders($userId: Int!) {
+query GetAllOrders($userId: String!) {
   getAllOrders(userId: $userId) {
-    orderId
+    id
     userId
-    orderId
     canteenId
-    items {
-      orderItemId
-      orderId
-      menuItemId
-      menuItemName
-      canteenId
-      canteenName
-      quantity
-      unitPrice
-      totalPrice
-      size
-      extras
-      preparationTime
-      isPrepared
-      specialInstructions
-      notes
-    }
-    subtotal
-    taxAmount
+    items
     totalAmount
     status
-    priority
-    taxRate
-    paymentStatus
+    orderTime
     paymentMethod
-    paymentId
-    cancellationReason
-    cancellationNotes
+    paymentStatus
+    customerNote
+    phone
     pickupTime
-    createdAt
-    updatedAt
+    isPreOrder
   }
 }
 `;
 
 export const GET_ACTIVE_ORDERS_OF_USER = gql`
-query GetActiveOrders($userId: Int!) {
+query GetActiveOrders($userId: String!) {
     getActiveOrders(userId: $userId) {
-        orderId
-        userId
-        orderId
-        canteenId
-        items {
-        orderItemId
-        orderId
-        menuItemId
-        menuItemName
-        canteenId
-        canteenName
-        quantity
-        unitPrice
-        totalPrice
-        size
-        extras
-        preparationTime
-        isPrepared
-        specialInstructions
-        notes
-        }
-        subtotal
-        taxAmount
-        totalAmount
-        status
-        priority
-        taxRate
-        paymentStatus
-        paymentMethod
-        paymentId
-        cancellationReason
-        cancellationNotes
-        pickupTime
-        createdAt
-        updatedAt
+      id
+      userId
+      canteenId
+      items
+      totalAmount
+      status
+      orderTime
+      paymentMethod
+      paymentStatus
+      customerNote
+      phone
+      pickupTime
+      isPreOrder
     }
 }
 `;
@@ -262,41 +219,19 @@ query GetActiveOrders($userId: Int!) {
 export const GET_ORDER_BY_ID = gql`
 query GetOrderById($orderId: Int!) {
   getOrderById(orderId: $orderId) {
-    orderId
+    id
     userId
-    orderId
     canteenId
-    items {
-      orderItemId
-      orderId
-      menuItemId
-      menuItemName
-      canteenId
-      canteenName
-      quantity
-      unitPrice
-      totalPrice
-      size
-      extras
-      preparationTime
-      isPrepared
-      specialInstructions
-      notes
-    }
-    subtotal
-    taxAmount
+    items
     totalAmount
     status
-    priority
-    taxRate
-    paymentStatus
+    orderTime
     paymentMethod
-    paymentId
-    cancellationReason
-    cancellationNotes
+    paymentStatus
+    customerNote
+    phone
     pickupTime
-    createdAt
-    updatedAt
+    isPreOrder
   }
 }
 `;

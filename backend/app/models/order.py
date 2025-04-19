@@ -21,7 +21,7 @@ class Order(Base):
     __tablename__ = "orders"
     
     id = Column(Integer, primary_key=True, index=True)
-    userId = Column(Integer, ForeignKey("users.id"))
+    userId = Column(String, ForeignKey("users.id"))
     canteenId = Column(Integer, ForeignKey("canteens.id"))
     items = Column(JSON)  # Store order items as JSON
     totalAmount = Column(Float, nullable=False)
@@ -40,7 +40,8 @@ class Order(Base):
     isPreOrder = Column(Boolean, default=False)
     cancelledTime = Column(String, nullable=True)
     cancellationReason = Column(String, nullable=True)
-    
+    payments = relationship("Payment", back_populates="order")
+
     # Relationships
     user = relationship("User", back_populates="orders")
     canteen = relationship("Canteen", back_populates="orders")

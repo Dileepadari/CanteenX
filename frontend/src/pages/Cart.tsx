@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApolloClient } from "@apollo/client";
-import { GET_CART_ITEMS } from "../gql/queries/cart";
-import { GET_CURRENT_USER } from "../gql/queries/user";
+import { GET_CART_ITEMS } from "@/gql/queries/cart";
+import { GET_CURRENT_USER } from "@/gql/queries/user";
+import { UPDATE_CART_ITEM, REMOVE_FROM_CART, CLEAR_CART} from "@/gql/mutations/cart"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -109,7 +110,18 @@ const Cart = () => {
     const totalAmount = cartItems.reduce((total, item) => total + (item.price || 0) * item.quantity, 0);
 
     const handleRemoveItem = async (itemId) => {
-        // TODO: Implement remove item mutation
+        try {
+            await client.mutate({
+                mutation: REMOVE_FROM_CART,
+                variables: { userId, cartItemId: itemId },
+            });
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "Failed to remove item from cart.",
+            });
+            return
+        }
         toast({
             title: "Item removed",
             description: "Item has been removed from your cart",
@@ -118,6 +130,21 @@ const Cart = () => {
     };
 
     const handleUpdateQuantity = async (itemId, newQuantity) => {
+        try {
+            await client.mutate({
+            mutation: UPDATE_CART_ITEM,
+            variables: { userId, cartItemId: itemId, quantity: newQuantity },
+            });
+            toast({
+            title: "Quantity updated",
+            description: "Item quantity has been updated in your cart",
+            });
+        } catch (error) {
+            toast({
+            title: "Error",
+            description: "Failed to update item quantity.",
+            });
+        }
         if (newQuantity < 1) return;
         // TODO: Implement update quantity mutation
         await fetchCartItems(userId);
@@ -177,7 +204,6 @@ const Cart = () => {
     const timeSlots = getTimeSlots();
 
     const handleCheckout = () => {
-
         if (!scheduledPickup) {
             toast({
                 title: "Pickup time required",
@@ -187,18 +213,8 @@ const Cart = () => {
             return;
         }
 
-        setIsProcessingPayment(true);
-
-        setTimeout(() => {
-            toast({
-                title: "Order placed successfully!",
-                description: "Your order has been confirmed.",
-            });
-            // TODO: Clear cart mutation or state update needed here
-            navigate("/orders");
-
-            setIsProcessingPayment(false);
-        }, 2000);
+        // Navigate to checkout page with cart information
+        navigate("/checkout");
     };
 
     return (

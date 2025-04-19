@@ -49,7 +49,7 @@ def resolve_get_complaint_by_id(complaintId: int) -> Optional[ComplaintType]:
         updatedAt=complaint.updatedAt
     )
 
-def resolve_get_complaints_by_user_id(userId: int) -> List[ComplaintType]:
+def resolve_get_complaints_by_user_id(userId: str) -> List[ComplaintType]:
     # Get database session
     db = next(get_db())
     

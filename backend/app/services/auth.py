@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.models.user import User
 from app.models.user_types import UserType  # Import from a central location
 from app.mutations.cart_mutations import CartMutation, CartMutationResponse
+from app.mutations.order_mutations import OrderMutation, OrderMutationResponse
 import strawberry
 
 @strawberry.type
@@ -98,3 +99,9 @@ class RootMutation:
     update_cart_item: CartMutationResponse = strawberry.field(resolver=CartMutation.update_cart_item)
     remove_from_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.remove_from_cart)
     clear_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.clear_cart)
+    create_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.create_order)
+    update_order_status: OrderMutationResponse = strawberry.field(resolver=OrderMutation.update_order_status)
+    place_scheduled_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.place_scheduled_order)
+    update_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.update_order)
+    cancel_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.cancel_order)
+    update_payment_status: OrderMutationResponse = strawberry.field(resolver=OrderMutation.update_payment_status)

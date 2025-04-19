@@ -8,20 +8,7 @@ from app.models.menu_item import MenuItem
 from datetime import datetime, timezone
 from strawberry.types import Info
 import jwt
-
-@strawberry.input
-class CustomizationsInput:
-    size: Optional[str] = None
-    additions: Optional[List[str]] = None
-    removals: Optional[List[str]] = None
-    notes: Optional[str] = None
-
-@strawberry.type
-class CustomizationsResponse:
-    size: Optional[str]
-    additions: Optional[List[str]]
-    removals: Optional[List[str]]
-    notes: Optional[str]
+from app.schemas.common import CustomizationsInput, CustomizationsResponse
 
 @strawberry.input
 class AddToCartInput:
@@ -101,22 +88,30 @@ class CartMutation:
             CartItem.selectedSize == selected_size_json,
             CartItem.selectedExtras == selected_extras_json,
         ).first()
-        customizations_obj = None
+        
+        customizations_dict = None
         if input.customizations:
             try:
-                customizations_dict = json.loads(input.customizations)
-                customizations_obj = CustomizationsResponse(
-                    size=customizations_dict.get("size"),
-                    additions=customizations_dict.get("additions"),
-                    removals=customizations_dict.get("removals"),
-                    notes=customizations_dict.get("notes"),
-                )
+                if isinstance(input.customizations, str):
+                    customizations_dict = json.loads(input.customizations)
+                else:
+                    # Create a clean dictionary without __typename
+                    customizations_dict = {}
+                    if hasattr(input.customizations, 'size'):
+                        customizations_dict['size'] = input.customizations.size
+                    if hasattr(input.customizations, 'additions'):
+                        customizations_dict['additions'] = input.customizations.additions
+                    if hasattr(input.customizations, 'removals'):
+                        customizations_dict['removals'] = input.customizations.removals
+                    if hasattr(input.customizations, 'notes'):
+                        customizations_dict['notes'] = input.customizations.notes
             except Exception:
-                customizations_obj = None
-        else:
-            customizations_obj = None
+                customizations_dict = None
+                
         if existing_item:
             existing_item.quantity += input.quantity
+            if customizations_dict:
+                existing_item.customizations = customizations_dict
             db.commit()
             db.refresh(existing_item)
             cart_item = existing_item
@@ -133,8 +128,7 @@ class CartMutation:
                 selectedExtras=selected_extras_json,
                 specialInstructions=input.specialInstructions,
                 location=input.location,
-                customizations=customizations_obj,
-                
+                customizations=customizations_dict,
             )
             db.add(new_cart_item)
             db.commit()
@@ -148,12 +142,13 @@ class CartMutation:
         if not menu_item:
             return CartMutationResponse(success=False, message="Menu item not found", cartItem=None)
 
-        customizations = json.dumps({
-            "size": selected_size_json if isinstance(selected_size_json, str) else None,
-            "additions": selected_extras_json.get("additions") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
-            "removals": selected_extras_json.get("removals") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
-            "notes": cart_item.specialInstructions,
-        })
+        # Create a proper customizations object instead of a string
+        custom_response = CustomizationsResponse(
+            size=selected_size_json if isinstance(selected_size_json, str) else None,
+            additions=selected_extras_json.get("additions") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
+            removals=selected_extras_json.get("removals") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
+            notes=cart_item.specialInstructions,
+        )
 
         cart_item_response = CartItemResponse(
             id=cart_item.id,
@@ -162,7 +157,7 @@ class CartMutation:
             quantity=cart_item.quantity,
             canteenId=menu_item.canteenId,
             canteenName=menu_item.canteenName,
-            customizations=customizations,
+            customizations=custom_response,
         )
 
         return CartMutationResponse(success=True, message="Item added to cart", cartItem=cart_item_response)
@@ -170,6 +165,7 @@ class CartMutation:
     @strawberry.mutation
     def update_cart_item(
         self,
+        userId: str,
         cartItemId: int,
         quantity: Optional[int] = None,
         selectedSize: Optional[str] = None,
@@ -183,13 +179,18 @@ class CartMutation:
 
         if not cart_item:
             return CartMutationResponse(success=False, message="Cart item not found")
+            
+        # Verify that the cart item belongs to the user
+        cart = db.query(Cart).filter(Cart.id == cart_item.cartId).first()
+        if not cart or cart.userId != userId:
+            return CartMutationResponse(success=False, message="Cart item does not belong to this user")
 
+        if quantity is not None:
+            cart_item.quantity = quantity
         if selectedSize is not None:
             cart_item.selectedSize = json.loads(selectedSize)
         if selectedExtras is not None:
             cart_item.selectedExtras = json.loads(selectedExtras)
-        if quantity is not None:
-            cart_item.quantity = quantity
         if specialInstructions is not None:
             cart_item.specialInstructions = specialInstructions
         if location is not None:
@@ -197,7 +198,6 @@ class CartMutation:
         if price is not None:
             cart_item.price = price
 
-        cart = db.query(Cart).filter(Cart.id == cart_item.cartId).first()
         if cart:
             cart.updatedAt = datetime.now(timezone.utc).isoformat()
         db.commit()
@@ -206,7 +206,7 @@ class CartMutation:
     @strawberry.mutation
     def remove_from_cart(
         self,
-        userId: int,
+        userId: str,
         cartItemId: int,
     ) -> CartMutationResponse:
         db: Session = next(get_db())
@@ -226,7 +226,7 @@ class CartMutation:
         return CartMutationResponse(success=True, message="Item removed from cart")
 
     @strawberry.mutation
-    def clear_cart(self, userId: int) -> CartMutationResponse:
+    def clear_cart(self, userId: str) -> CartMutationResponse:
         db: Session = next(get_db())
         cart = db.query(Cart).filter(Cart.userId == userId).first()
 

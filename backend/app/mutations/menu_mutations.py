@@ -36,7 +36,7 @@ class MenuMutation:
         price: float,
         canteenId: int,
         canteenName: str,
-        currentUserId: int,
+        currentUserId: str,
         description: Optional[str] = None,
         image: Optional[str] = None,
         category: Optional[str] = None,
@@ -107,7 +107,7 @@ class MenuMutation:
     def update_menu_item(
         self,
         itemId: int,
-        currentUserId: int,
+        currentUserId: str,
         name: Optional[str] = None,
         price: Optional[float] = None,
         description: Optional[str] = None,
@@ -174,7 +174,7 @@ class MenuMutation:
     def delete_menu_item(
         self,
         itemId: int,
-        currentUserId: int
+        currentUserId: str
     ) -> MenuItemMutationResponse:
         """Delete a menu item"""
         db = next(get_db())

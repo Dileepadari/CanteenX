@@ -44,26 +44,57 @@ def resolve_get_cart_by_user_id(userId: str) -> Optional[CartType]:
     cart_items = db.query(CartItem).filter(CartItem.cartId == cart.id).all()
     cart_items_types = []
     for item in cart_items:
-        selected_size = item.selectedSize
-        if selected_size is not None:
-            try:
-                selected_size = json.dumps(selected_size)
-            except Exception:
-                selected_size = None
-        selected_extras = item.selectedExtras
-        if selected_extras is not None:
-            try:
-                selected_extras = json.loads(json.dumps(selected_extras))
-            except Exception:
-                selected_extras = None
         customizations = None
-        if selected_size or selected_extras or item.specialInstructions:
+        
+        # Handle the customizations properly
+        if item.customizations:
+            custom_data = item.customizations
+            # If customizations is stored as a string, parse it to a dictionary
+            if isinstance(custom_data, str):
+                try:
+                    custom_data = json.loads(custom_data)
+                except Exception:
+                    custom_data = {}
+                
+            if isinstance(custom_data, dict):
+                customizations = CustomizationsType(
+                    size=custom_data.get("size"),
+                    additions=custom_data.get("additions"),
+                    removals=custom_data.get("removals"),
+                    notes=custom_data.get("notes") or item.specialInstructions,
+                )
+            else:
+                # Fallback for legacy or incorrectly formatted data
+                customizations = CustomizationsType(
+                    size=None,
+                    additions=None,
+                    removals=None,
+                    notes=item.specialInstructions,
+                )
+        elif item.selectedSize or item.selectedExtras or item.specialInstructions:
+            # Handle legacy data format
+            selected_size = item.selectedSize
+            if selected_size is not None and isinstance(selected_size, str):
+                try:
+                    selected_size = json.loads(selected_size)
+                except Exception:
+                    selected_size = item.selectedSize
+                    
+            selected_extras = item.selectedExtras
+            if selected_extras is not None:
+                try:
+                    if isinstance(selected_extras, str):
+                        selected_extras = json.loads(selected_extras)
+                except Exception:
+                    selected_extras = {}
+                    
             customizations = CustomizationsType(
-                size=selected_size if isinstance(selected_size, str) else None,
-                additions=selected_extras.get("additions") if selected_extras and isinstance(selected_extras, dict) else None,
-                removals=selected_extras.get("removals") if selected_extras and isinstance(selected_extras, dict) else None,
+                size=selected_size if not isinstance(selected_size, dict) else None,
+                additions=selected_extras.get("additions") if isinstance(selected_extras, dict) else None,
+                removals=selected_extras.get("removals") if isinstance(selected_extras, dict) else None,
                 notes=item.specialInstructions,
             )
+            
         cart_items_types.append(CartItemType(
             id=item.id,
             cartId=item.cartId,

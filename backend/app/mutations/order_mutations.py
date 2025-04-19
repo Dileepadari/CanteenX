@@ -8,13 +8,7 @@ from app.models.user import User
 from app.core.database import get_db
 import json
 from sqlalchemy.orm import Session
-
-@strawberry.input
-class CustomizationsInput:
-    size: Optional[str] = None
-    additions: Optional[List[str]] = None
-    removals: Optional[List[str]] = None
-    notes: Optional[str] = None
+from app.schemas.common import CustomizationsInput
 
 @strawberry.type
 class OrderMutationResponse:
@@ -34,7 +28,7 @@ class OrderMutation:
     @strawberry.mutation
     def create_order(
         self,
-        userId: int,
+        userId: str,
         canteenId: int,
         items: List[OrderItemInput],
         paymentMethod: str,
@@ -57,16 +51,37 @@ class OrderMutation:
                     )
                 totalAmount += menu_item.price * item.quantity
 
+            # Process the items for the order
+            processed_items = []
+            for item in items:
+                item_dict = {
+                    "itemId": item.itemId,
+                    "quantity": item.quantity,
+                    "note": item.note
+                }
+                
+                # Handle customizations, removing __typename if present
+                if item.customizations:
+                    customizations_dict = {}
+                    if hasattr(item.customizations, 'size'):
+                        customizations_dict['size'] = item.customizations.size
+                    if hasattr(item.customizations, 'additions'):
+                        customizations_dict['additions'] = item.customizations.additions
+                    if hasattr(item.customizations, 'removals'):
+                        customizations_dict['removals'] = item.customizations.removals
+                    if hasattr(item.customizations, 'notes'):
+                        customizations_dict['notes'] = item.customizations.notes
+                    # Add customizations only if we have valid data
+                    if customizations_dict:
+                        item_dict["customizations"] = customizations_dict
+                
+                processed_items.append(item_dict)
+
             # Create order
             new_order = Order(
                 userId=userId,
                 canteenId=canteenId,
-                items=[{
-                    "itemId": item.itemId,
-                    "quantity": item.quantity,
-                    "customizations": item.customizations,
-                    "note": item.note
-                } for item in items],
+                items=processed_items,
                 totalAmount=totalAmount,
                 status="pending",
                 orderTime=datetime.utcnow().isoformat(),
@@ -97,7 +112,7 @@ class OrderMutation:
         self,
         orderId: int,
         status: str,
-        currentUserId: int,
+        currentUserId: str,
     ) -> OrderMutationResponse:
         """Update order status - only canteen vendor can update status"""
         db = next(get_db())
@@ -148,7 +163,7 @@ class OrderMutation:
     @strawberry.mutation
     def place_scheduled_order(
         self,
-        userId: int,
+        userId: str,
         canteenId: int,
         items: List[OrderItemInput],
         subtotal: float,
@@ -161,15 +176,36 @@ class OrderMutation:
         """Place a scheduled order"""
         db = next(get_db())
         try:
+            # Process the items for the order
+            processed_items = []
+            for item in items:
+                item_dict = {
+                    "itemId": item.itemId,
+                    "quantity": item.quantity,
+                    "note": item.note
+                }
+                
+                # Handle customizations, removing __typename if present
+                if item.customizations:
+                    customizations_dict = {}
+                    if hasattr(item.customizations, 'size'):
+                        customizations_dict['size'] = item.customizations.size
+                    if hasattr(item.customizations, 'additions'):
+                        customizations_dict['additions'] = item.customizations.additions
+                    if hasattr(item.customizations, 'removals'):
+                        customizations_dict['removals'] = item.customizations.removals
+                    if hasattr(item.customizations, 'notes'):
+                        customizations_dict['notes'] = item.customizations.notes
+                    # Add customizations only if we have valid data
+                    if customizations_dict:
+                        item_dict["customizations"] = customizations_dict
+                
+                processed_items.append(item_dict)
+
             new_order = Order(
                 userId=userId,
                 canteenId=canteenId,
-                items=[{
-                    "itemId": item.itemId,
-                    "quantity": item.quantity,
-                    "customizations": item.customizations,
-                    "note": item.note
-                } for item in items],
+                items=processed_items,
                 totalAmount=totalAmount,
                 status="scheduled",
                 orderTime=datetime.utcnow().isoformat(),
@@ -242,9 +278,9 @@ class OrderMutation:
     @strawberry.mutation
     def cancel_order(
         self,
+        userId: str,
         orderId: int,
-        userId: int,
-        reason: str
+        reason: Optional[str] = None,
     ) -> OrderMutationResponse:
         """Cancel an order"""
         db = next(get_db())
@@ -290,7 +326,7 @@ class OrderMutation:
         self,
         orderId: int,
         paymentStatus: str,
-        currentUserId: int,
+        currentUserId: str,
     ) -> OrderMutationResponse:
         """Update payment status - only canteen vendor or admin can update"""
         db = next(get_db())

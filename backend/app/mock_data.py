@@ -11,6 +11,8 @@ from app.models.menu_item import MenuItem
 from app.models.user import User
 from app.models.cart import Cart, CartItem
 from app.models.order import Order, OrderItem, OrderStep
+from app.models.payment import Merchant
+from app.core.database import SessionLocal
 
 def add_mock_users(db: Session):
     """Add mock users to the database"""
@@ -557,6 +559,56 @@ def add_mock_orders(db: Session):
     db.commit()
     print("✅ Mock orders added to database")
 
+#  Payment mock merchant data
+
+def create_merchant_data(db: Session):
+    db = SessionLocal()
+    try:
+        # Check if merchants already exist
+        existing_merchant = db.query(Merchant).first()
+        if existing_merchant:
+            print("Merchant data already exists")
+            return
+
+        # Create merchants for each canteen
+        merchants = [
+            Merchant(
+                canteen_id=1,
+                name="VC",
+                razorpay_merchant_id="north_merchant",
+                razorpay_key_id="REDACTED_ROTATED_KEY_ID",
+                razorpay_key_secret="REDACTED_ROTATED_SECRET",
+                is_active=True
+            ),
+            Merchant(
+                canteen_id=2,
+                name="Tantra",
+                razorpay_merchant_id="south_merchant",
+                razorpay_key_id="REDACTED_ROTATED_KEY_ID",
+                razorpay_key_secret="REDACTED_ROTATED_SECRET",
+                is_active=True
+            ),
+            Merchant(
+                canteen_id=3,
+                name="David's",
+                razorpay_merchant_id="cafeteria_merchant",
+                razorpay_key_id="REDACTED_ROTATED_KEY_ID",
+                razorpay_key_secret="REDACTED_ROTATED_SECRET",
+                is_active=True
+            )
+        ]
+
+        db.add_all(merchants)
+        db.commit()
+        print("Created merchant data")
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating merchant data: {e}")
+    finally:
+        db.close()
+
+
+
 def initialize_mock_data():
     """Initialize database with mock data"""
     try:
@@ -571,6 +623,9 @@ def initialize_mock_data():
         add_mock_menu_items(db)
         add_mock_cart_data(db)
         add_mock_orders(db)
+        create_merchant_data(db)
+
+        
         
         print("✅ All mock data added successfully")
     except Exception as e:

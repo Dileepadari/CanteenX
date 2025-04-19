@@ -120,3 +120,12 @@ export const SCHEDULE_INPUT = gql`
     weekend: String
   }
 `;
+
+export const GET_CANTEEN_MERCHANT = gql`
+  query GetCanteenMerchant($canteenId: ID!) {
+    getCanteenMerchant(canteenId: $canteenId) {
+      id
+      name
+    }
+  }
+`;

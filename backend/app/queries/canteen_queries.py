@@ -29,7 +29,7 @@ class CanteenType:
     email: Optional[str]
     schedule: Optional[ScheduleType]
     tags: Optional[List[str]]
-    userId: Optional[int]
+    userId: Optional[str]
 
 @strawberry.type
 class CanteenQuery:

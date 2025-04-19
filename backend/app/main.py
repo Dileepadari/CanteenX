@@ -12,6 +12,7 @@ from app.core.database import Base, engine
 from app.core.utils import create_default_user  # Updated import
 from app.models import user
 from app.queries import queries
+from app.api import payment
 
 Base.metadata.create_all(bind=engine)
 
@@ -37,6 +38,8 @@ app.add_middleware(
 api_router = APIRouter()
 api_router.include_router(graphql_app, prefix="/graphql")
 app.include_router(api_router, prefix="/api")
+app.include_router(payment.router)
+
 
 @app.get("/api/hello")
 async def read_root():

@@ -7,7 +7,8 @@ from app.core.database import get_db
 class UserMutationResponse:
     success: bool
     message: str
-    userId: Optional[int] = None
+    userId: Optional[str] = None
+    token: Optional[str] = None
 
 @strawberry.type
 class UserMutation:
@@ -44,7 +45,7 @@ class UserMutation:
             return UserMutationResponse(
                 success=True,
                 message="User created successfully",
-                userId=new_user.id
+                userId=str(new_user.id)
             )
         except Exception as e:
             db.rollback()
@@ -56,7 +57,7 @@ class UserMutation:
     @strawberry.mutation
     def update_user_profile(
         self,
-        userId: int,
+        userId: str,
         name: Optional[str] = None,
         email: Optional[str] = None,
     ) -> UserMutationResponse:
@@ -83,7 +84,7 @@ class UserMutation:
             return UserMutationResponse(
                 success=True,
                 message="Profile updated successfully",
-                userId=user.id
+                userId=str(user.id)
             )
         except Exception as e:
             db.rollback()
@@ -95,7 +96,7 @@ class UserMutation:
     @strawberry.mutation
     def update_favorite_canteens(
         self,
-        userId: int,
+        userId: str,
         canteenIds: List[int],
     ) -> UserMutationResponse:
         """Update user's favorite canteens"""
@@ -111,7 +112,7 @@ class UserMutation:
             return UserMutationResponse(
                 success=True,
                 message="Favorite canteens updated successfully",
-                userId=user.id
+                userId=str(user.id)
             )
         except Exception as e:
             db.rollback()
@@ -120,9 +121,87 @@ class UserMutation:
                 message=f"Failed to update favorite canteens: {str(e)}"
             )
 
+    @strawberry.mutation
+    def update_user(
+        self,
+        userId: str,
+        name: Optional[str] = None,
+        email: Optional[str] = None,
+        password: Optional[str] = None,
+        role: Optional[str] = None,
+        upi_id: Optional[str] = None,
+    ) -> UserMutationResponse:
+        """Update user profile"""
+        db = next(get_db())
+        user = db.query(User).filter(User.id == userId).first()
+        
+        if not user:
+            return UserMutationResponse(success=False, message="User not found")
+            
+        try:
+            if name:
+                user.name = name
+            if email and email != user.email:
+                # Check if email is already taken
+                if db.query(User).filter(User.email == email).first():
+                    return UserMutationResponse(
+                        success=False,
+                        message="Email is already taken"
+                    )
+                user.email = email
+                
+            if password:
+                user.password = password
+            if role:
+                user.role = role
+            if upi_id:
+                user.upi_id = upi_id
+                
+            db.commit()
+            return UserMutationResponse(
+                success=True,
+                message="Profile updated successfully",
+                userId=str(user.id)
+            )
+        except Exception as e:
+            db.rollback()
+            return UserMutationResponse(
+                success=False,
+                message=f"Failed to update profile: {str(e)}"
+            )
+
+    @strawberry.mutation
+    def delete_user(
+        self,
+        userId: str,
+    ) -> UserMutationResponse:
+        """Delete user"""
+        db = next(get_db())
+        user = db.query(User).filter(User.id == userId).first()
+        
+        if not user:
+            return UserMutationResponse(success=False, message="User not found")
+            
+        try:
+            db.delete(user)
+            db.commit()
+            return UserMutationResponse(
+                success=True,
+                message="User deleted successfully",
+                userId=str(user.id)
+            )
+        except Exception as e:
+            db.rollback()
+            return UserMutationResponse(
+                success=False,
+                message=f"Failed to delete user: {str(e)}"
+            )
+
 # Export the mutation fields
 mutations = [
     strawberry.field(name="createUser", resolver=UserMutation.create_user),
     strawberry.field(name="updateUserProfile", resolver=UserMutation.update_user_profile),
     strawberry.field(name="updateFavoriteCanteens", resolver=UserMutation.update_favorite_canteens),
+    strawberry.field(name="updateUser", resolver=UserMutation.update_user),
+    strawberry.field(name="deleteUser", resolver=UserMutation.delete_user),
 ]

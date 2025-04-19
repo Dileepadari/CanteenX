@@ -18,7 +18,7 @@ class ComplaintMutation:
     @strawberry.mutation
     def create_complaint(
         self,
-        userId: int,
+        userId: str,
         orderId: int,
         complaintText: str,
         heading: str,

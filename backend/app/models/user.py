@@ -11,7 +11,9 @@ class User(Base):
     role = Column(String)
     favoriteCanteens = Column(JSON, default=lambda: [])  # Store as JSON array
     recentOrders = Column(JSON, default=lambda: [])  # Store as JSON array
-    
+    upi_id = Column(String, nullable=True)
+    wallet = relationship("UserWallet", back_populates="user", uselist=False)
+    payments = relationship("Payment", back_populates="user")
     # Relationships
     orders = relationship("Order", back_populates="user")
     canteens = relationship("Canteen", back_populates="user")

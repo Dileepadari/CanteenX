@@ -13,6 +13,8 @@ import Menu from "./pages/Menu";
 import OrderHistory from "./pages/OrderHistory";
 import OrderDetails from "./pages/OrderDetails";
 import OrderTracking from "./pages/OrderTracking";
+import Checkout from "./pages/Checkout";
+import Payment from "./pages/Payment";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import VendorDashboard from "./pages/vendor/VendorDashboard";
@@ -54,6 +56,8 @@ const App = () => (
                     <Route path="/canteen/:id" element={<CanteenDetails />} />
                     <Route path="/menu" element={<Menu />} />
                     <Route path="/cart" element={<Cart />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/payment/:id" element={<Payment />} />
                     <Route path="/orders" element={<OrderHistory />} />
                     <Route path="/orders/:id" element={<OrderDetails />} />
                     <Route path="/orders/track/:id" element={<OrderTracking />} />

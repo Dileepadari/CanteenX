@@ -18,8 +18,8 @@ class Mutation:
     @strawberry.mutation
     def create_canteen(
         self,
-        currUserId: int,
-        userId:int,
+        currUserId: str,
+        userId: str,
         name: str,
         location: str,
         phone: str,
@@ -96,7 +96,7 @@ class Mutation:
     def update_canteen(
         self,
         canteenId: int,
-        userId: int,
+        userId: str,
         name: Optional[str] = None,
         location: Optional[str] = None,
         phone: Optional[str] = None,
@@ -153,7 +153,7 @@ class Mutation:
     def delete_canteen(
         self,
         canteenId: int,
-        currUserId:int,
+        currUserId: str,
     ) -> CanteenMutationResponse:
         """Delete a canteen"""
         db = next(get_db())
@@ -189,7 +189,7 @@ class Mutation:
         self,
         canteenId: int,
         isOpen: bool,
-        userId: int,  # For authorization
+        userId: str,  # For authorization
     ) -> CanteenMutationResponse:
         """Update canteen open/closed status"""
         db = next(get_db())
@@ -220,9 +220,46 @@ class Mutation:
                 message=f"Failed to update canteen status: {str(e)}"
             )
 
+    @strawberry.mutation
+    def toggle_canteen(
+        self,
+        canteenId: int,
+        userId: str,
+        isOpen: bool,
+    ) -> CanteenMutationResponse:
+        """Toggle canteen open/closed status"""
+        db = next(get_db())
+        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
+        
+        if not canteen:
+            return CanteenMutationResponse(success=False, message="Canteen not found")
+            
+        # Verify vendor authorization
+        if canteen.userId != userId:
+            return CanteenMutationResponse(
+                success=False,
+                message="Unauthorized: Only the canteen owner can toggle status"
+            )
+            
+        try:
+            canteen.isOpen = isOpen
+            db.commit()
+            return CanteenMutationResponse(
+                success=True,
+                message=f"Canteen status updated to {'open' if isOpen else 'closed'}",
+                canteenId=canteen.id
+            )
+        except Exception as e:
+            db.rollback()
+            return CanteenMutationResponse(
+                success=False,
+                message=f"Failed to update canteen status: {str(e)}"
+            )
+
 mutations = [
     strawberry.field(name="createCanteen", resolver=Mutation.create_canteen),
     strawberry.field(name="updateCanteen", resolver=Mutation.update_canteen),
     strawberry.field(name="deleteCanteen", resolver=Mutation.delete_canteen),
     strawberry.field(name="updateCanteenStatus", resolver=Mutation.update_canteen_status),
+    strawberry.field(name="toggleCanteen", resolver=Mutation.toggle_canteen),
 ]
