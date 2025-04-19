@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUserStore } from "@/stores/userStore";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { LOGIN_MUTATION } from "@/gql/mutations/users";
+import { LOGIN_MUTATION, CAS_REDIRECT_QUERY } from "@/gql/mutations/users";
 import { useMutation } from "@apollo/client";
 
 const simulateCASAuthentication = (email: string, password: string) => {
@@ -62,6 +62,7 @@ const Login = () => {
   
 
   const [loginMutation] = useMutation(LOGIN_MUTATION);
+  const [handleCAS] = useMutation(CAS_REDIRECT_QUERY);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,23 +114,28 @@ const Login = () => {
     setIsCASOauth(true);
     
     // Simulate redirecting to CAS and coming back with authentication
-    setTimeout(() => {
-      const mockUser = {
-        id: `user-${Math.floor(Math.random() * 1000)}`,
-        name: "John Doe",
-        email: "johndoe@campus.edu",
-        role: "student" as "student" | "faculty" | "staff",
-        canteenCredits: 0,
-      };
-      
-      login(mockUser);
+    setTimeout(async () => {
+      try {
+        const { data } = await handleCAS();
+        window.location.href = `${data?.InitiateCasLogin}`
+        console.log("CAS Authentication successful:", data);
+      }
+      catch (error) {
+        toast({
+          title: "CAS Authentication Failed",
+          description: "Failed to authenticate with CAS. Please try again.",
+          variant: "destructive",
+        });
+        setIsCASOauth(false);
+        return;
+      }
+
       
       toast({
         title: "CAS Authentication successful",
-        description: `Welcome back, ${mockUser.name}!`,
+        description: `Welcome back, ${"user"}!`,
       });
       
-      navigate('/');
     }, 3000);
   };
 

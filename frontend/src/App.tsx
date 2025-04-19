@@ -31,6 +31,7 @@ import LogOut from "./pages/LogOut";
 
 import { GqlProvider } from "./gql/client";
 import useAuthMiddleware from "./middleware";
+import Cas from "./pages/Cas";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
                   <Routes>
                     {/* User Pages */}
                     <Route path="/" element={<Index />} />
+                    <Route path="/cas" element={<Cas />} />
                     <Route path="/canteens" element={<Canteens />} />
                     <Route path="/canteen/:id" element={<CanteenDetails />} />
                     <Route path="/menu" element={<Menu />} />

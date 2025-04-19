@@ -6,7 +6,7 @@ from strawberry.tools import create_type
 from fastapi import Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.services import queries
+from app.services import queries, mutations
 from app.services.auth import RootMutation
 from app.core.database import Base, engine
 from app.core.utils import create_default_user  # Updated import
@@ -23,6 +23,7 @@ async def get_context(request: Request, response: Response):
     }
 
 Query = create_type("Query", queries)
+Mutation = create_type("Mutation", mutations)
 graphql_schema = strawberry.Schema(query=Query, mutation=RootMutation)
 graphql_app = GraphQLRouter(schema=graphql_schema, context_getter = get_context)
 app = FastAPI()

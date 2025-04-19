@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.user_types import UserType  # Import from a central location
 from app.mutations.cart_mutations import CartMutation, CartMutationResponse
 from app.mutations.order_mutations import OrderMutation, OrderMutationResponse
+from app.services.cas import CASMutations, AuthPayload
 import strawberry
 from app.mutations.menu_mutations import MenuMutation,MenuItemMutationResponse
 
@@ -26,7 +27,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @strawberry.type
-class Mutation:
+class AuthMutations:
     @strawberry.mutation
     async def login(self, info, username: str, password: str) -> LoginResponse:
         response: Response = info.context['response']
@@ -95,7 +96,9 @@ class Mutation:
 
 @strawberry.type
 class RootMutation:
-    login: LoginResponse = strawberry.field(resolver=Mutation.login)
+    login: LoginResponse = strawberry.field(resolver=AuthMutations.login)
+    InitiateCasLogin: str= strawberry.field(resolver=CASMutations.InitiateCasLogin)
+    verifyCasTicket: AuthPayload = strawberry.field(resolver=CASMutations.verify_cas_ticket)
     add_to_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.add_to_cart)
     update_cart_item: CartMutationResponse = strawberry.field(resolver=CartMutation.update_cart_item)
     remove_from_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.remove_from_cart)

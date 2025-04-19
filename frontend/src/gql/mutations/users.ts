@@ -76,3 +76,20 @@ export const DEACTIVATE_USER = gql`
     }
   }
 `;
+
+export const CAS_REDIRECT_QUERY = gql`
+  mutation {
+    InitiateCasLogin
+  }
+`;
+
+export const CAS_VERIFY_QUERY = gql`
+  mutation VerifyCasTicket($ticket: String!) {
+    verifyCasTicket(ticket: $ticket) {
+      success
+      message
+      token
+    }
+  }
+`;
+
