@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "./contexts/CartContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import Index from "./pages/Index";
+import Cart from "./pages/Cart";
 import Canteens from "./pages/Canteens";
 import CanteenDetails from "./pages/CanteenDetails";
 import Menu from "./pages/Menu";
@@ -52,6 +53,7 @@ const App = () => (
                     <Route path="/canteens" element={<Canteens />} />
                     <Route path="/canteen/:id" element={<CanteenDetails />} />
                     <Route path="/menu" element={<Menu />} />
+                    <Route path="/cart" element={<Cart />} />
                     <Route path="/orders" element={<OrderHistory />} />
                     <Route path="/orders/:id" element={<OrderDetails />} />
                     <Route path="/orders/track/:id" element={<OrderTracking />} />

@@ -1,20 +1,64 @@
-
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import HeroSection from "@/components/home/HeroSection";
 import CanteenCard from "@/components/canteen/CanteenCard";
 import CategoryList from "@/components/home/CategoryList";
-import { canteens, categories, menuItems } from "@/data/mockData";
+import { categories } from "@/data/mockData";
 import MenuItemCard from "@/components/food/MenuItemCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import MenuItemWithCustomization from "@/components/food/MenuItemWithCustomization";
-
+import { useApolloClient } from "@apollo/client"; // Import Apollo Client
+import { GET_CANTEENS } from "@/gql/queries/canteens"; // Added import for the query
+import { GET_MENU_ITEMS } from "@/gql/queries/menuItems"; // Added import for th
 
 const Index = () => {
-  
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [canteens, setCanteens] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { toast } = useToast();
+  const client = useApolloClient(); // Get Apollo Client instance
+
+  useEffect(() => {
+    const fetchCanteens = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_CANTEENS });
+        setCanteens(data?.getAllCanteens || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch canteens.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCanteens();
+  }, [client, toast]);
+
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_MENU_ITEMS });
+        setMenuItems(data?.getMenuItems || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch menu items.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenuItems();
+  }, [client, toast]);
 
   // Filter menu items based on selected category
   const filteredItems = selectedCategory
@@ -24,6 +68,7 @@ const Index = () => {
           categories.find((c) => c.id === selectedCategory)?.name.toLowerCase()
       )
     : menuItems.filter((item) => item.isPopular).slice(0, 8);
+
   return (
     <MainLayout>
       <HeroSection />
@@ -38,9 +83,15 @@ const Index = () => {
             </a>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {canteens.map((canteen) => (
-              <CanteenCard key={canteen.id} canteen={canteen} />
-            ))}
+            {loading ? (
+              <p>Loading...</p>
+            ) : error ? (
+              <p>Error loading canteens.</p>
+            ) : (
+              canteens.map((canteen) => (
+                <CanteenCard key={canteen.id} canteen={canteen} />
+              ))
+            )}
           </div>
         </div>
 
@@ -55,7 +106,6 @@ const Index = () => {
               </TabsList>
             </div>
 
-            
             <TabsContent value="popular">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {menuItems

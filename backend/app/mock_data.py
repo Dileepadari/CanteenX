@@ -30,9 +30,78 @@ def add_mock_users(db: Session):
 def add_mock_canteens(db: Session):
     """Add mock canteens to the database"""
     canteens = [
-        Canteen(id=1, name="Central Canteen", location="Main Building", openTime="08:00", closeTime="20:00"),
-        Canteen(id=2, name="Library Cafe", location="Library Building", openTime="09:00", closeTime="18:00"),
-        Canteen(id=3, name="Tech Hub Canteen", location="Technology Block", openTime="07:30", closeTime="22:00")
+        Canteen(
+            id=1,
+            name="Central Canteen",
+            image="/placeholder.svg",
+            location="Main Building",
+            rating=4.2,
+            openTime="08:00",
+            closeTime="20:00",
+            isOpen=True,
+            description="A popular spot for diverse meals.",
+            phone="040-12345678",
+            email="centralcanteen@canteen.com",
+            schedule={
+                "breakfast": "08:00 AM - 10:00 AM",
+                "lunch": "12:00 PM - 02:00 PM",
+                "dinner": "07:00 PM - 09:00 PM",
+                "regular": "08:00 AM - 09:00 PM",
+                "evening": "04:00 PM - 06:00 PM",
+                "night": None,
+                "weekday": "08:00 AM - 09:00 PM",
+                "weekend": "08:00 AM - 10:00 PM",
+            },
+            tags=["Popular", "Diverse"],
+        ),
+        Canteen(
+            id=2,
+            name="Library Cafe",
+            image="/placeholder.svg",
+            location="Library Building",
+            rating=3.8,
+            openTime="09:00",
+            closeTime="18:00",
+            isOpen=False,
+            description="Cozy cafe near the library.",
+            phone="040-87654321",
+            email="librarycafe@canteen.com",
+            schedule={
+                "breakfast": "09:00 AM - 11:00 AM",
+                "lunch": "12:30 PM - 02:30 PM",
+                "dinner": None,
+                "regular": "09:00 AM - 06:00 PM",
+                "evening": "04:00 PM - 05:30 PM",
+                "night": None,
+                "weekday": "09:00 AM - 06:00 PM",
+                "weekend": "10:00 AM - 04:00 PM",
+            },
+            tags=["Cozy", "Quiet"],
+        ),
+        Canteen(
+            id=3,
+            name="Tech Hub Canteen",
+            image="/placeholder.svg",
+            location="Technology Block",
+            rating=4.5,
+            openTime="07:30",
+            closeTime="22:00",
+            isOpen=True,
+            description="Techies' favorite spot for quick bites.",
+            phone="040-11223344",
+            email="techhub@canteen.com",
+            schedule={
+                "breakfast": "07:30 AM - 09:30 AM",
+                "lunch": "12:00 PM - 02:00 PM",
+                "dinner": "07:00 PM - 10:00 PM",
+                "regular": "07:30 AM - 10:00 PM",
+                "evening": "05:00 PM - 07:00 PM",
+                "night": None,
+                "weekday": "07:30 AM - 10:00 PM",
+                "weekend": "08:00 AM - 11:00 PM",
+            },
+            tags=["Tech", "Quick Bites"],
+        ),
     ]
     
     for canteen in canteens:
@@ -47,29 +116,113 @@ def add_mock_menu_items(db: Session):
     """Add mock menu items to the database"""
     menu_items = [
         MenuItem(
-            id=1, name="Paneer Butter Masala", description="Rich and creamy paneer curry",
-            price=180.0, image="https://images.unsplash.com/photo-1567188040759-fb8a254b3bd2?q=80&w=300&auto=format&fit=crop",
-            category="Indian Delights", canteenId=1, isAvailable=True, tags=["Vegetarian"], isPopular=True
+            id=101,
+            canteenId=1,
+            canteenName="Faculty Lounge",
+            name="Masala Dosa",
+            description="Crispy rice crepe filled with spiced potato mixture, served with sambar and chutney",
+            price=60,
+            category="Breakfast",
+            image="https://images.unsplash.com/photo-1589301760014-d929f3979dbc?q=80&w=2070&auto=format&fit=crop",
+            tags=["South Indian", "Vegetarian"],
+            rating=4.5,
+            ratingCount=120,
+            isAvailable=True,
+            preparationTime=15,
+            isPopular=True,
+            customizationOptions={
+                "sizes": [
+                    {"name": "small", "price": 50},
+                    {"name": "medium", "price": 60},
+                    {"name": "large", "price": 70},
+                ],
+                "additions": [
+                    {"name": "Extra Chutney", "price": 10},
+                    {"name": "Ghee Roast", "price": 15},
+                ],
+                "removals": ["Onions", "Green Chilies"],
+            },
         ),
         MenuItem(
-            id=2, name="Masala Dosa", description="Crispy crepe filled with spicy potato filling",
-            price=80.0, image="https://images.unsplash.com/photo-1589301760014-d929f86731c7?q=80&w=300&auto=format&fit=crop",
-            category="South Indian", canteenId=1, isAvailable=True, tags=["Vegetarian"], isPopular=False
+            id=102,
+            canteenId=2,
+            canteenName="Faculty Lounge",
+            name="Chole Bhature",
+            description="Spicy chickpea curry served with deep-fried bread",
+            price=80,
+            category="Lunch",
+            image="https://images.unsplash.com/photo-1589352911312-5d218efc96be?q=80&w=1974&auto=format&fit=crop",
+            tags=["North Indian", "Vegetarian"],
+            rating=4.3,
+            ratingCount=95,
+            isAvailable=True,
+            preparationTime=20,
+            isPopular=True,
+            customizationOptions={
+                "sizes": [
+                    {"name": "small", "price": 70},
+                    {"name": "medium", "price": 80},
+                    {"name": "large", "price": 90},
+                ],
+                "additions": [
+                    {"name": "Extra Bhature", "price": 20},
+                    {"name": "Onions on Side", "price": 0},
+                ],
+                "removals": ["Spices"],
+            },
         ),
         MenuItem(
-            id=3, name="Cold Coffee", description="Refreshing cold coffee with ice cream",
-            price=70.0, image="https://images.unsplash.com/photo-1594631252845-29fc4cc8cde9?q=80&w=300&auto=format&fit=crop",
-            category="Beverages", canteenId=2, isAvailable=True, tags=["Vegetarian"], isPopular=True
+            id=103,
+            canteenId=1,
+            canteenName="Central Canteen",
+            name="Chicken Biryani",
+            description="Fragrant basmati rice cooked with chicken, spices, and herbs",
+            price=120,
+            category="Lunch",
+            image="https://images.unsplash.com/photo-1589309736404-be8c25f8dea8?q=80&w=1974&auto=format&fit=crop",
+            tags=["Hyderabadi", "Non-Vegetarian"],
+            rating=4.7,
+            ratingCount=150,
+            isAvailable=True,
+            preparationTime=30,
+            isPopular=True,
+            customizationOptions={
+                "sizes": [
+                    {"name": "small", "price": 100},
+                    {"name": "medium", "price": 120},
+                    {"name": "large", "price": 140},
+                ],
+                "additions": [
+                    {"name": "Extra Raita", "price": 15},
+                    {"name": "Extra Spicy", "price": 0},
+                ],
+                "removals": ["Coriander"],
+            },
         ),
         MenuItem(
-            id=4, name="Veg Burger", description="Delicious vegetable patty with fresh veggies",
-            price=90.0, image="https://images.unsplash.com/photo-1550317138-10000687a72b?q=80&w=300&auto=format&fit=crop",
-            category="Fast Food", canteenId=3, isAvailable=True, tags=["Vegetarian"], isPopular=True
-        ),
-        MenuItem(
-            id=5, name="French Fries", description="Crispy potato fries with seasoning",
-            price=60.0, image="https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?q=80&w=300&auto=format&fit=crop",
-            category="Fast Food", canteenId=3, isAvailable=True, tags=["Vegetarian"], isPopular=False
+            id=104,
+            canteenId=1,
+            canteenName="Central Canteen",
+            name="Veg Pulao",
+            description="Basmati rice cooked with mixed vegetables and mild spices",
+            price=90,
+            category="Dinner",
+            image="https://images.unsplash.com/photo-1596797038530-2c107aa4606c?q=80&w=1935&auto=format&fit=crop",
+            tags=["North Indian", "Vegetarian"],
+            rating=4.0,
+            ratingCount=80,
+            isAvailable=False,
+            preparationTime=25,
+            isPopular=False,
+            customizationOptions={
+                "sizes": [
+                    {"name": "small", "price": 80},
+                    {"name": "medium", "price": 90},
+                    {"name": "large", "price": 100},
+                ],
+                "additions": [{"name": "Extra Raita", "price": 15}],
+                "removals": ["Peas"],
+            },
         ),
     ]
     
@@ -88,91 +241,96 @@ def add_mock_cart_data(db: Session):
     if not cart1:
         cart1 = Cart(
             userId="a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            items=[
+                {
+                    "menuItemId": 1,
+                    "quantity": 1,
+                    "selectedSize": "Medium",
+                    "selectedExtras": json.dumps(["Extra Paneer"]),
+                    "specialInstructions": "Extra spicy",
+                    "location": "Table 5",
+                    "name": "Masala Dosa",
+                    "price": 60.0,
+                    "canteenId": 1,
+                    "canteenName": "Central Canteen",
+                    "customizations": json.dumps({
+                        "size": "Medium",
+                        "additions": ["Extra Paneer"],
+                        "removals": ["Onions"],
+                        "notes": "Extra spicy"
+                    })
+                },
+                {
+                    "menuItemId": 3,
+                    "quantity": 2,
+                    "selectedSize": "Large",
+                    "selectedExtras": json.dumps(["Less Sugar", "Regular Ice"]),
+                    "specialInstructions": "Extra cold",
+                    "location": "Table 7",
+                    "name": "Chicken Biryani",
+                    "price": 120.0,
+                    "canteenId": 1,
+                    "canteenName": "Central Canteen",
+                    "customizations": json.dumps({
+                        "size": "Large",
+                        "additions": ["Less Sugar", "Regular Ice"],
+                        "removals": [],
+                        "notes": "Extra cold"
+                    })
+                }
+            ],
             createdAt=datetime.datetime.utcnow().isoformat(),
             updatedAt=datetime.datetime.utcnow().isoformat()
         )
         db.add(cart1)
-        db.flush()  # Get the ID without committing
-    
-    # Clear any existing cart items for this cart
-    db.query(CartItem).filter(CartItem.cartId == cart1.id).delete()
-    
-    # Add items to cart 1
-    cart_items = [
-        CartItem(
-            cartId=cart1.id,
-            menuItemId=1,
-            quantity=1,
-            selectedExtras=json.dumps({
-                "Spice Level": "Medium",
-                "Extra Paneer": True
-            }),
-            specialInstructions="Extra spicy"
-        ),
-        CartItem(
-            cartId=cart1.id,
-            menuItemId=3,
-            quantity=2,
-            selectedExtras=json.dumps({
-                "Sugar": "Less",
-                "Ice": "Regular"
-            }),
-            specialInstructions="Extra cold"
-        ),
-        CartItem(
-            cartId=cart1.id,
-            menuItemId=4,
-            quantity=1,
-            selectedExtras=json.dumps({
-                "Extra Cheese": True,
-                "No Onion": True
-            }),
-            specialInstructions="Well done"
-        )
-    ]
-    
-    for item in cart_items:
-        db.add(item)
     
     # Create cart for user 2
     cart2 = db.query(Cart).filter(Cart.userId == "b2c3d4e5-f6a7-8901-bcde-f12345678901").first()
     if not cart2:
         cart2 = Cart(
             userId="b2c3d4e5-f6a7-8901-bcde-f12345678901",
+            items=[
+                {
+                    "menuItemId": 2,
+                    "quantity": 2,
+                    "selectedSize": "Small",
+                    "selectedExtras": json.dumps(["Extra Chutney"]),
+                    "specialInstructions": "Extra crispy",
+                    "location": "Table 3",
+                    "name": "Chole Bhature",
+                    "price": 80.0,
+                    "canteenId": 2,
+                    "canteenName": "Library Cafe",
+                    "customizations": json.dumps({
+                        "size": "Small",
+                        "additions": ["Extra Chutney"],
+                        "removals": [],
+                        "notes": "Extra crispy"
+                    })
+                },
+                {
+                    "menuItemId": 5,
+                    "quantity": 1,
+                    "selectedSize": "Medium",
+                    "selectedExtras": json.dumps(["Extra Salt", "Ketchup"]),
+                    "specialInstructions": "Extra crispy",
+                    "location": "Table 1",
+                    "name": "Veg Pulao",
+                    "price": 90.0,
+                    "canteenId": 2,
+                    "canteenName": "Library Cafe",
+                    "customizations": json.dumps({
+                        "size": "Medium",
+                        "additions": ["Extra Salt", "Ketchup"],
+                        "removals": [],
+                        "notes": "Extra crispy"
+                    })
+                }
+            ],
             createdAt=datetime.datetime.utcnow().isoformat(),
             updatedAt=datetime.datetime.utcnow().isoformat()
         )
         db.add(cart2)
-        db.flush()  # Get the ID without committing
-    
-    # Clear any existing cart items for this cart
-    db.query(CartItem).filter(CartItem.cartId == cart2.id).delete()
-    
-    # Add items to cart 2
-    cart_items = [
-        CartItem(
-            cartId=cart2.id,
-            menuItemId=2,
-            quantity=2,
-            selectedExtras=json.dumps({
-                "Extra Chutney": True
-            }),
-            specialInstructions="Extra crispy"
-        ),
-        CartItem(
-            cartId=cart2.id,
-            menuItemId=5,
-            quantity=1,
-            selectedExtras=json.dumps({
-                "Extra Salt": True,
-                "Sauce": "Ketchup"
-            }),
-            specialInstructions="Extra crispy"
-        )
-    ]
-    
-    for item in cart_items:
-        db.add(item)
     
     db.commit()
     print("✅ Mock cart data added to database")

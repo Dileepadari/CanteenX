@@ -4,6 +4,22 @@ from app.models.menu_item import MenuItem
 from app.core.database import get_db
 
 @strawberry.type
+class SizeOption:
+    name: str
+    price: float
+
+@strawberry.type
+class AdditionOption:
+    name: str
+    price: float
+
+@strawberry.type
+class CustomizationOptionsType:
+    sizes: List[SizeOption]
+    additions: List[AdditionOption]
+    removals: List[str]
+
+@strawberry.type
 class MenuItemType:
     id: int
     name: str
@@ -21,9 +37,16 @@ class MenuItemType:
     isFeatured: bool = False
     isPopular: bool = False
     preparationTime: int = 15
-    customizationOptions: Optional[str] = None  # JSON string
+    customizationOptions: Optional[CustomizationOptionsType] = None
 
 def map_menu_item_to_type(item: MenuItem) -> MenuItemType:
+    customization_options = None
+    if item.customizationOptions:
+        customization_options = item.customizationOptions
+        customization_options.setdefault("sizes", [])
+        customization_options.setdefault("additions", [])
+        customization_options.setdefault("removals", [])
+
     return MenuItemType(
         id=item.id,
         canteenId=item.canteenId,
@@ -37,9 +60,13 @@ def map_menu_item_to_type(item: MenuItem) -> MenuItemType:
         rating=item.rating,
         ratingCount=item.ratingCount,
         isAvailable=item.isAvailable,
-        preparationTime=item.preparationTime,
+        preparationTime=item.preparationTime if item.preparationTime is not None else 15,
         isPopular=item.isPopular,
-        customizationOptions=item.customizationOptions
+        customizationOptions=CustomizationOptionsType(
+            sizes=[SizeOption(**size) for size in customization_options["sizes"]],
+            additions=[AdditionOption(**addition) for addition in customization_options["additions"]],
+            removals=customization_options["removals"],
+        ) if customization_options else None,
     )
 
 

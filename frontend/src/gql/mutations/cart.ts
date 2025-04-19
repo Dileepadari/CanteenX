@@ -8,29 +8,26 @@ import { gql } from "graphql-tag";
  * Mutation to add a menu item to the user's cart
  */
 export const ADD_TO_CART = gql`
-mutation AddToCart(
-  $userId: Int!,
-  $menuItemId: Int!,
-  $quantity: Int,
-  $selectedSize: String,
-  $selectedExtras: String,
-  $specialInstructions: String,
-  $location: String
-) {
-  addToCart(
-    userId: $userId,
-    menuItemId: $menuItemId,
-    quantity: $quantity,
-    selectedSize: $selectedSize,
-    selectedExtras: $selectedExtras,
-    specialInstructions: $specialInstructions,
-    location: $location
-  ) {
+mutation AddToCart($input: AddToCartInput!) {
+  addToCart(input: $input) {
     success
     message
+    cartItem {
+      id
+      name
+      price
+      quantity
+      customizations {
+        size
+        additions
+        removals
+        notes
+      }
+    }
   }
 }
 `;
+
 
 /**
  * Mutation to update a cart item's details (quantity, size, extras, etc.)

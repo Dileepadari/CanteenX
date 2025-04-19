@@ -10,7 +10,7 @@ class UserType:
     password: Optional[str] = None
     favoriteCanteens: Optional[List[int]] = None
     recentOrders: Optional[List[int]] = None
-    profile_picture: Optional[str] = None
+    profilePicture: Optional[str] = None
     preferred_payment: Optional[str] = None
-    is_vegetarian: Optional[bool] = False
-    notif_prefs: Optional[List[str]] = None
+    isVegetarian: Optional[bool] = False
+    notifPrefs: Optional[List[str]] = None

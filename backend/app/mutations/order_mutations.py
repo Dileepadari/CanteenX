@@ -1,5 +1,5 @@
 import strawberry
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from app.models.order import Order, OrderItem
 from app.models.menu_item import MenuItem
@@ -8,6 +8,13 @@ from app.models.user import User
 from app.core.database import get_db
 import json
 from sqlalchemy.orm import Session
+
+@strawberry.input
+class CustomizationsInput:
+    size: Optional[str] = None
+    additions: Optional[List[str]] = None
+    removals: Optional[List[str]] = None
+    notes: Optional[str] = None
 
 @strawberry.type
 class OrderMutationResponse:
@@ -19,7 +26,7 @@ class OrderMutationResponse:
 class OrderItemInput:
     itemId: int
     quantity: int
-    customizations: Optional[List[str]] = None
+    customizations: Optional[CustomizationsInput] = None
     note: Optional[str] = None
 
 @strawberry.type

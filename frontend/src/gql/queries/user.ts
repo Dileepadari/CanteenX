@@ -67,3 +67,19 @@ export const SEARCH_USERS = gql`
     }
   }
 `;
+
+export const GET_CURRENT_USER = gql`
+  query GetCurrentUser {
+    getCurrentUser {
+      id
+      name
+      email
+      role
+      favoriteCanteens
+      recentOrders
+      profilePicture
+      isVegetarian
+      notifPrefs
+    }
+  }
+`;

@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUserStore } from "@/stores/userStore";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { LOGIN_MUTATION } from "@/gql/mutations/user";
+import { LOGIN_MUTATION } from "@/gql/mutations/users";
 import { useMutation } from "@apollo/client";
 
 const simulateCASAuthentication = (email: string, password: string) => {

@@ -3,7 +3,7 @@
 // Canteens
 export const canteens = [
   {
-    id: 1,
+    id: 0,
     name: "Himalaya Food Court",
     image: "/placeholder.svg",
     location: "Near Academic Block",
@@ -28,7 +28,7 @@ export const canteens = [
     tags: ["Vegetarian", "Fast Food", "Beverages"], // Added tags
   },
   {
-    id: 2,
+    id: 1,
     name: "Central Canteen",
     image: "/placeholder.svg",
     location: "Main Campus",

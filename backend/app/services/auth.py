@@ -8,13 +8,13 @@ import os
 from app.core.database import get_db
 from app.models.user import User
 from app.models.user_types import UserType  # Import from a central location
+from app.mutations.cart_mutations import CartMutation, CartMutationResponse
+import strawberry
 
 @strawberry.type
 class LoginResponse:
     message: str
     user: UserType
-
-
 
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key")
 ALGORITHM = "HS256"
@@ -32,8 +32,7 @@ class Mutation:
         db = next(get_db())
 
         try:
-            # Query the user using SQLAlchemy ORM
-            user = db.query(User).filter(User.name == username).first()  # Fetch user by username
+            user = db.query(User).filter(User.name == username).first()
 
             if not user or not pwd_context.verify(password, user.password):
                 return LoginResponse(
@@ -45,9 +44,7 @@ class Mutation:
                         role="unknown"
                     )
                 )
-                # raise HTTPException(status_code=401, detail="Invalid credentials")
 
-            # Create access and refresh tokens
             access_token = jwt.encode(
                 {"user_id": user.id, "name": user.name, "role": user.role, "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)},
                 JWT_SECRET, algorithm=ALGORITHM
@@ -58,7 +55,6 @@ class Mutation:
                 JWT_SECRET, algorithm=ALGORITHM
             )
 
-            # Set cookies in response
             response.set_cookie(
                 key="accessToken",
                 value=access_token,
@@ -73,7 +69,6 @@ class Mutation:
                 max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
             )
 
-            # Return login response with user details
             return LoginResponse(
                 message="Login successful",
                 user=UserType(
@@ -95,3 +90,11 @@ class Mutation:
                     role="unknown"
                 )
             )
+
+@strawberry.type
+class RootMutation:
+    login: LoginResponse = strawberry.field(resolver=Mutation.login)
+    add_to_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.add_to_cart)
+    update_cart_item: CartMutationResponse = strawberry.field(resolver=CartMutation.update_cart_item)
+    remove_from_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.remove_from_cart)
+    clear_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.clear_cart)

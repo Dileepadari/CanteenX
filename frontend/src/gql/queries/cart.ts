@@ -1,14 +1,7 @@
-/**
- * GraphQL queries related to shopping cart
- */
-
 import { gql } from "graphql-tag";
 
-/**
- * Query to fetch all items in a user's cart
- */
 export const GET_CART_ITEMS = gql`
-  query GetCartByUserId($userId: Int!) {
+  query GetCartByUserId($userId: String!) {
     getCartByUserId(userId: $userId) {
       id
       userId
@@ -20,9 +13,17 @@ export const GET_CART_ITEMS = gql`
         id
         cartId
         menuItemId
+        name
+        price
         quantity
-        selectedSize
-        selectedExtras
+        canteenId
+        canteenName
+        customizations {
+          size
+          additions
+          removals
+          notes
+        }
         specialInstructions
         location
       }
@@ -30,28 +31,26 @@ export const GET_CART_ITEMS = gql`
   }
 `;
 
-/**
- * Query to fetch cart with minimal item details (for quick checks)
- */
 export const GET_CART_SUMMARY = gql`
-  query GetCartByUserId($userId: Int!) {
+  query GetCartByUserId($userId: String!) {
     getCartByUserId(userId: $userId) {
       id
       userId
       items {
         id
         menuItemId
+        name
+        price
         quantity
+        canteenId
+        canteenName
       }
     }
   }
 `;
 
-/**
- * Query to fetch cart with item details for checkout
- */
 export const GET_CART_FOR_CHECKOUT = gql`
-  query GetCartByUserId($userId: Int!) {
+  query GetCartByUserId($userId: String!) {
     getCartByUserId(userId: $userId) {
       id
       userId
@@ -62,16 +61,20 @@ export const GET_CART_FOR_CHECKOUT = gql`
       items {
         id
         menuItemId
+        name
+        price
         quantity
-        selectedSize
-        selectedExtras
+        canteenId
+        canteenName
+        customizations {
+          size
+          additions
+          removals
+          notes
+        }
         specialInstructions
         location
       }
     }
   }
 `;
-
-
-
-

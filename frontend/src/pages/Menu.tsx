@@ -11,16 +11,68 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import MenuItemWithCustomization from "@/components/food/MenuItemWithCustomization";
-import { canteens as mockCanteens, menuItems as mockFoodItems, categories as foodCategories } from "@/data/mockData";
+import { categories as foodCategories } from "@/data/mockData";
+import { useApolloClient } from "@apollo/client"; // Import Apollo Client
+import { GET_MENU_ITEMS } from "@/gql/queries/menuItems"; // Added import for th
+import { GET_CANTEENS } from "@/gql/queries/canteens"; // Added import for the query
+import { Console } from "console";
+
 
 const Menu = () => {
+  const [mockFoodItems, setMenuItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState(mockFoodItems);
+  const [mockCanteens, setCanteens] = useState([]);
   const [selectedCanteen, setSelectedCanteen] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<string>("popularity");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+  const client = useApolloClient(); // Get Apollo Client instance
+  
+    useEffect(() => {
+      const fetchCanteens = async () => {
+        try {
+          setLoading(true);
+          const { data } = await client.query({ query: GET_CANTEENS });
+          setCanteens(data?.getAllCanteens || []);
+        } catch (err) {
+          setError(err);
+          toast({
+            title: "Error",
+            description: "Failed to fetch canteens.",
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchCanteens();
+    }, [client, toast]);
+  
+  
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_MENU_ITEMS });
+        setMenuItems(data?.getMenuItems || []);
+        setFilteredItems(data?.getMenuItems || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch menu items.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenuItems();
+  }, [client, toast]);
 
   const navigate = useNavigate();
 
@@ -30,7 +82,7 @@ const Menu = () => {
 
     // Filter by canteen
     if (selectedCanteen !== "all") {
-      result = result.filter((item) => item.canteenId === selectedCanteen);
+      result = result.filter((item) => item.canteenId === parseInt(selectedCanteen));
     }
 
     // Filter by category

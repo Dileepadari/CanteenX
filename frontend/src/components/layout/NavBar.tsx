@@ -53,7 +53,7 @@ const NavBar = () => {
 
           {/* Cart (Only show on user routes) */}
           {!isVendorRoute && (
-            <Link to="/menu">
+            <Link to="/cart">
               <Button variant="outline" size="icon" className="relative">
                 <ShoppingCart  />
                 {items.length > 0 && (

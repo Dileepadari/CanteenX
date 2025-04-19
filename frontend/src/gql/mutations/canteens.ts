@@ -1,4 +1,3 @@
-// Canteen mutations
 import { gql } from "graphql-tag";
 
 export const CREATE_CANTEEN = gql`
@@ -11,7 +10,10 @@ export const CREATE_CANTEEN = gql`
     $openTime: String!,
     $closeTime: String!,
     $description: String,
-    $image: String
+    $image: String,
+    $email: String,
+    $schedule: ScheduleInput,
+    $tags: [String!]
   ) {
     createCanteen(
       currUserId: $currUserId,
@@ -22,7 +24,10 @@ export const CREATE_CANTEEN = gql`
       openTime: $openTime,
       closeTime: $closeTime,
       description: $description,
-      image: $image
+      image: $image,
+      email: $email,
+      schedule: $schedule,
+      tags: $tags
     ) {
       success
       message
@@ -42,7 +47,10 @@ export const UPDATE_CANTEEN = gql`
     $closeTime: String,
     $description: String,
     $image: String,
-    $isOpen: Boolean
+    $isOpen: Boolean,
+    $email: String,
+    $schedule: ScheduleInput,
+    $tags: [String!]
   ) {
     updateCanteen(
       canteenId: $canteenId,
@@ -54,7 +62,10 @@ export const UPDATE_CANTEEN = gql`
       closeTime: $closeTime,
       description: $description,
       image: $image,
-      isOpen: $isOpen
+      isOpen: $isOpen,
+      email: $email,
+      schedule: $schedule,
+      tags: $tags
     ) {
       success
       message
@@ -94,4 +105,18 @@ export const UPDATE_CANTEEN_STATUS = gql`
       canteenId
     }
   }
-`; 
+`;
+
+// Define ScheduleInput input type for schedule object
+export const SCHEDULE_INPUT = gql`
+  input ScheduleInput {
+    breakfast: String
+    lunch: String
+    dinner: String
+    regular: String
+    evening: String
+    night: String
+    weekday: String
+    weekend: String
+  }
+`;

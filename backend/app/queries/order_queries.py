@@ -1,17 +1,31 @@
 import json
 import strawberry
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.models.order import OrderItem, Order
 from app.core.database import get_db
 from sqlalchemy import desc, func
 from datetime import datetime
 
+@strawberry.input
+class CustomizationsInput:
+    size: Optional[str] = None
+    additions: Optional[List[str]] = None
+    removals: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+@strawberry.type
+class Customizations:
+    size: Optional[str]
+    additions: Optional[List[str]]
+    removals: Optional[List[str]]
+    notes: Optional[str]
+
 @strawberry.type
 class OrderItemType:
-    id: Optional[int] = None  # Made optional to avoid missing key error
+    id: Optional[int]
     itemId: int
     quantity: int
-    customizations: Optional[List[str]] = None
+    customizations: Optional[Customizations] = None
     note: Optional[str] = None
 
 @strawberry.type
@@ -43,10 +57,26 @@ def map_order_to_type(order: Order) -> OrderType:
     order_items = []
     if order.items:
         for item_data in order.items:
+            customizations_obj = None
+            if item_data.get('customizations'):
+                try:
+                    customizations_dict = item_data.get('customizations')
+                    if isinstance(customizations_dict, str):
+                        customizations_dict = json.loads(customizations_dict)
+                    customizations_obj = Customizations(
+                        size=customizations_dict.get("size"),
+                        additions=customizations_dict.get("additions"),
+                        removals=customizations_dict.get("removals"),
+                        notes=customizations_dict.get("notes"),
+                    )
+                except Exception:
+                    customizations_obj = None
+
             item = OrderItemType(
+                id=item_data.get('id'),
                 itemId=item_data.get('itemId'),
                 quantity=item_data.get('quantity', 1),
-                customizations=item_data.get('customizations'),
+                customizations=customizations_obj,
                 note=item_data.get('note')
             )
             order_items.append(item)

@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useCartStore } from "@/stores/cartStore";
-
+import { useApolloClient, gql } from "@apollo/client";
+import { ADD_TO_CART } from "@/gql/mutations/cart";
 export interface FoodItem {
   id: string;
   name: string;
@@ -33,6 +33,7 @@ export interface FoodItem {
   };
 }
 
+
 const MenuItemWithCustomization = ({ item }: { item: FoodItem }) => {
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -42,7 +43,7 @@ const MenuItemWithCustomization = ({ item }: { item: FoodItem }) => {
   const [notes, setNotes] = useState("");
   const [totalPrice, setTotalPrice] = useState(item.price);
 
-  const { addItem } = useCartStore();
+  const client = useApolloClient();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -101,17 +102,51 @@ const MenuItemWithCustomization = ({ item }: { item: FoodItem }) => {
     ) {
       setIsCustomizationOpen(true);
     } else {
-      addItem({
+      sendAddToCartMutation({
         id: item.id,
         name: item.name,
         price: item.price,
         quantity: 1,
         canteenId: item.canteenId,
         canteenName: item.canteenName,
+        customizations: null,
       });
+    }
+  };
+
+  const sendAddToCartMutation = async (cartItem) => {
+    try {
+      const { data } = await client.mutate({
+        mutation: ADD_TO_CART,
+        variables: {
+          input: {
+            menuItemId: cartItem.id, // Ensure this is passed correctly
+            name: cartItem.name,
+            price: cartItem.price,
+            quantity: cartItem.quantity,
+            canteenId: cartItem.canteenId,
+            canteenName: cartItem.canteenName,
+            customizations: cartItem.customizations,
+          },
+        },
+      });
+      if (data.addToCart.success) {
+        toast({
+          title: "Added to cart",
+          description: `${cartItem.quantity}x ${cartItem.name} has been added to your cart`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.addToCart.message || "Failed to add item to cart",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Added to cart",
-        description: `${item.name} has been added to your cart`,
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
       });
     }
   };
@@ -135,7 +170,7 @@ const MenuItemWithCustomization = ({ item }: { item: FoodItem }) => {
       });
     }
 
-    addItem({
+    sendAddToCartMutation({
       id: item.id,
       name: item.name,
       price: finalPrice,
@@ -148,11 +183,6 @@ const MenuItemWithCustomization = ({ item }: { item: FoodItem }) => {
         removals: selectedRemovals.length > 0 ? selectedRemovals : undefined,
         notes: notes || undefined,
       },
-    });
-
-    toast({
-      title: "Added to cart",
-      description: `${quantity}x ${item.name} has been added to your cart`,
     });
 
     setIsCustomizationOpen(false);

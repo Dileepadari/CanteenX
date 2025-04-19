@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Filter, MapPin, Clock } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
@@ -25,7 +25,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { canteens } from "@/data/mockData";
+import { useToast } from "@/hooks/use-toast";
+import { useApolloClient } from "@apollo/client"; // Import Apollo Client
+import { GET_CANTEENS } from "@/gql/queries/canteens"; // Added import for the query
+
 
 // Define filters
 interface FiltersState {
@@ -40,6 +43,33 @@ const Canteens = () => {
     isOpen: null,
     sortBy: "popularity",
   });
+
+  const [canteens, setCanteens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+  const client = useApolloClient(); // Get Apollo Client instance
+
+  useEffect(() => {
+    const fetchCanteens = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_CANTEENS });
+        setCanteens(data?.getAllCanteens || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch canteens.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCanteens();
+  }, [client, toast]);
+
 
   // Filter canteens based on current filters
   const filteredCanteens = canteens.filter((canteen) => {

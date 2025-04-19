@@ -1,6 +1,6 @@
 import { gql } from "graphql-tag";
 
-// Query to get all canteens with basic info
+// Query to get all canteens with basic info including new fields
 export const GET_CANTEENS = gql`
    query GetCanteens {
     getAllCanteens {
@@ -14,12 +14,24 @@ export const GET_CANTEENS = gql`
       isOpen
       description
       phone
+      email
+      schedule {
+        breakfast
+        lunch
+        dinner
+        regular
+        evening
+        night
+        weekday
+        weekend
+      }
+      tags
       userId
     }
   }
 `;
 
-// Query to get a specific canteen by ID with full details
+// Query to get a specific canteen by ID with full details including new fields
 export const GET_CANTEEN_BY_ID = gql`
   query GetCanteenById($id: Int!) {
     getCanteenById(id: $id) {
@@ -33,12 +45,24 @@ export const GET_CANTEEN_BY_ID = gql`
       isOpen
       description
       phone
+      email
+      schedule {
+        breakfast
+        lunch
+        dinner
+        regular
+        evening
+        night
+        weekday
+        weekend
+      }
+      tags
       userId
     }
   }
 `;
 
-// Query to get currently open canteens
+// Query to get currently open canteens including new fields
 export const GET_OPEN_CANTEENS = gql`
   query GetOpenCanteens {
     getOpenCanteens {
@@ -48,26 +72,19 @@ export const GET_OPEN_CANTEENS = gql`
       rating
       openTime
       closeTime
+      email
+      schedule {
+        breakfast
+        lunch
+        dinner
+        regular
+        evening
+        night
+        weekday
+        weekend
+      }
+      tags
       userId
     }
   }
 `;
-
-
-/*
-this query returns featured items corresponding to specific canteen:
-*/
-
-// export const GET_FEATURED_ITEMS = gql`
-// query GetFeaturedMenuItems($canteenId : Int!){
-//   getFeaturedMenuItems(canteenId: $canteenId) {
-//     id
-//     name
-//     description
-//     price
-//     category
-//     isFeatured
-//     canteenId
-//   }
-// }
-// `

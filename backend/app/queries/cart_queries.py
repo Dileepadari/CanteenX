@@ -1,82 +1,82 @@
 import strawberry
-import datetime
 import json
 from typing import List, Optional
-
-
 from app.models.cart import Cart, CartItem
 from app.core.database import get_db
-
-import strawberry
-from typing import Optional, List
 from datetime import datetime
 
+@strawberry.type
+class CustomizationsType:
+    size: Optional[str]
+    additions: Optional[List[str]]
+    removals: Optional[List[str]]
+    notes: Optional[str]
 
 @strawberry.type
 class CartItemType:
     id: int
     cartId: int
     menuItemId: int
+    name: Optional[str]
+    price: Optional[float]
     quantity: int
-    selectedSize: Optional[str] = None  # Changed to string to store the selected size name
-    selectedExtras: Optional[str] = None  # Changed to list of strings for selected extras
-    specialInstructions: Optional[str] = None
-    location: Optional[str] = None
+    canteenId: Optional[int]
+    canteenName: Optional[str]
+    customizations: Optional[CustomizationsType]
+    specialInstructions: Optional[str]
+    location: Optional[str]
 
 @strawberry.type
 class CartType:
     id: int
-    userId: int
-    createdAt: str  # ISO format string
-    updatedAt: str  # ISO format string
+    userId: str
+    createdAt: str
+    updatedAt: str
     pickupDate: Optional[str]
     pickupTime: Optional[str]
-    items: Optional[List[CartItemType]] = None  # if you're resolving related items
+    items: Optional[List[CartItemType]] = None
 
-def resolve_get_cart_by_user_id(userId: int) -> Optional[CartType]:
-    # Get database session
+def resolve_get_cart_by_user_id(userId: str) -> Optional[CartType]:
     db = next(get_db())
-    
-    # Query for the cart associated with the user
     cart = db.query(Cart).filter(Cart.userId == userId).first()
-    
     if not cart:
         return None
-    
-    # Query for cart items
     cart_items = db.query(CartItem).filter(CartItem.cartId == cart.id).all()
-    
-    # Convert cart items to CartItemType objects
     cart_items_types = []
     for item in cart_items:
-        # Handle selectedSize - convert from dict/JSON to string if needed
         selected_size = item.selectedSize
         if selected_size is not None:
             try:
                 selected_size = json.dumps(selected_size)
             except Exception:
                 selected_size = None
-                
-        # Handle selectedExtras - convert from dict/JSON to list of strings if needed
         selected_extras = item.selectedExtras
         if selected_extras is not None:
             try:
-                selected_extras = json.dumps(selected_extras)
+                selected_extras = json.loads(json.dumps(selected_extras))
             except Exception:
                 selected_extras = None
-        
+        customizations = None
+        if selected_size or selected_extras or item.specialInstructions:
+            customizations = CustomizationsType(
+                size=selected_size if isinstance(selected_size, str) else None,
+                additions=selected_extras.get("additions") if selected_extras and isinstance(selected_extras, dict) else None,
+                removals=selected_extras.get("removals") if selected_extras and isinstance(selected_extras, dict) else None,
+                notes=item.specialInstructions,
+            )
         cart_items_types.append(CartItemType(
             id=item.id,
             cartId=item.cartId,
             menuItemId=item.menuItemId,
+            name=getattr(item, "name", None),
+            price=getattr(item, "price", None),
             quantity=item.quantity,
-            selectedSize=selected_size,
-            selectedExtras=selected_extras,
+            canteenId=getattr(item, "canteenId", None),
+            canteenName=getattr(item, "canteenName", None),
+            customizations=customizations,
             specialInstructions=item.specialInstructions,
             location=item.location
         ))
-    
-    # Create and return CartType with all items
     return CartType(
         id=cart.id,
         userId=cart.userId,
@@ -87,7 +87,6 @@ def resolve_get_cart_by_user_id(userId: int) -> Optional[CartType]:
         items=cart_items_types
     )
 
-# Create properly decorated field with resolver
 getCartByUserId = strawberry.field(name="getCartByUserId", resolver=resolve_get_cart_by_user_id)
 
 queries = [

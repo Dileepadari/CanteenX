@@ -1,38 +1,4 @@
-/*
-
-this query is for updating the price of an item by the vendor :
-*/
-
 import { gql } from "graphql-tag";
-
-export const UPDATE_PRICE = gql`
-mutation UpdateMenuItemPrice($itemId:Int!, $price: Float!, $currentUserId:Int!){
-  updateMenuItemPrice(
-    itemId: $itemId, 
-    price: $price,
-    currentUserId: $currentUserId
-  ) {
-    success
-    message
-  }
-}
-`;
-
-
-
-/**
- 
-this query is to update the availability of an item 
- */
-
-export const UPDATE_AVAILABILITY = gql`
-mutation UpdateAvailability($itemId:Int!, $isAvailable:Boolean!, $currentUserId:Int!){
-  updateMenuItemAvailability(itemId: $itemId, isAvailable: $isAvailable, currentUserId: $currentUserId) {
-    success
-    message
-  }
-}
-`;
 
 export const CREATE_MENU_ITEM = gql`
   mutation CreateMenuItem(
@@ -44,7 +10,7 @@ export const CREATE_MENU_ITEM = gql`
     $description: String,
     $image: String,
     $category: String,
-    $tags: [String],
+    $tags: [String!],
     $isPopular: Boolean,
     $preparationTime: Int,
     $customizationOptions: CustomizationOptionsInput
@@ -105,49 +71,35 @@ export const UPDATE_MENU_ITEM = gql`
 `;
 
 export const DELETE_MENU_ITEM = gql`
-  mutation DeleteMenuItem($itemId: Int!, $currentUserId: Int!) {
-    deleteMenuItem(itemId: $itemId, currentUserId: $currentUserId) {
+  mutation DeleteMenuItem(
+    $itemId: Int!,
+    $currentUserId: Int!
+  ) {
+    deleteMenuItem(
+      itemId: $itemId,
+      currentUserId: $currentUserId
+    ) {
       success
       message
-      itemId
     }
   }
 `;
 
-export const TOGGLE_FEATURED_STATUS = gql`
-mutation ToggleFeaturedStatus($itemId: Int!, $currentUserId: Int!) {
-  toggleFeaturedStatus(itemId: $itemId, currentUserId: $currentUserId) {
-    success
-    message
+// Input types for customization options
+export const CUSTOMIZATION_OPTIONS_INPUT = gql`
+  input SizeOptionInput {
+    name: String!
+    price: Float!
   }
-}
-`;
 
-export const UPDATE_PREPARATION_TIME = gql`
-mutation UpdatePreparationTime($itemId: Int!, $preparationTime: Int!, $currentUserId: Int!) {
-  updatePreparationTime(itemId: $itemId, preparationTime: $preparationTime, currentUserId: $currentUserId) {
-    success
-    message
+  input AdditionOptionInput {
+    name: String!
+    price: Float!
   }
-}
-`;
 
-export const UPDATE_CUSTOMIZATION_OPTIONS = gql`
-mutation UpdateCustomizationOptions($itemId: Int!, $customizationOptions: String!, $currentUserId: Int!) {
-  updateCustomizationOptions(itemId: $itemId, customizationOptions: $customizationOptions, currentUserId: $currentUserId) {
-    success
-    message
+  input CustomizationOptionsInput {
+    sizes: [SizeOptionInput!]
+    additions: [AdditionOptionInput!]
+    removals: [String!]
   }
-}
 `;
-
-export const UPDATE_SIZE_VARIATIONS = gql`
-mutation UpdateSizeVariations($itemId: Int!, $sizeVariations: String!, $currentUserId: Int!) {
-  updateSizeVariations(itemId: $itemId, sizeVariations: $sizeVariations, currentUserId: $currentUserId) {
-    success
-    message
-  }
-}
-`;
-
-

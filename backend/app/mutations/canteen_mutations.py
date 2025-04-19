@@ -4,6 +4,8 @@ from datetime import time, datetime
 from app.models.canteen import Canteen
 from app.models.user import User
 from app.core.database import get_db
+import strawberry
+from typing import List, Optional, Dict
 
 @strawberry.type
 class CanteenMutationResponse:
@@ -24,7 +26,10 @@ class Mutation:
         openTime: str,  # Format: "HH:MM"
         closeTime: str,  # Format: "HH:MM"
         description: Optional[str] = None,
-        image: Optional[str] = None
+        image: Optional[str] = None,
+        email: Optional[str] = None,
+        schedule: Optional[Dict[str, Optional[str]]] = None,
+        tags: Optional[List[str]] = None
     ) -> CanteenMutationResponse:
         """Create a new canteen"""
         db = next(get_db())
@@ -46,6 +51,7 @@ class Mutation:
             
         try:
             # Parse time strings
+            dt = None
             try:
                 dt = datetime.strptime(openTime, "%H:%M")
                 openTime_obj = time(dt.hour, dt.minute)
@@ -65,6 +71,9 @@ class Mutation:
                 closeTime=closeTime,
                 description=description,
                 image=image,
+                email=email,
+                schedule=schedule,
+                tags=tags,
                 rating=0.0,
                 isOpen=True,
                 userId=userId
@@ -95,7 +104,10 @@ class Mutation:
         closeTime: Optional[str] = None,
         description: Optional[str] = None,
         image: Optional[str] = None,
-        isOpen: Optional[bool] = None
+        isOpen: Optional[bool] = None,
+        email: Optional[str] = None,
+        schedule: Optional[Dict[str, Optional[str]]] = None,
+        tags: Optional[List[str]] = None
     ) -> CanteenMutationResponse:
         """Update canteen details"""
         db = next(get_db())
@@ -120,6 +132,9 @@ class Mutation:
             if description is not None: canteen.description = description
             if image is not None: canteen.image = image
             if isOpen is not None: canteen.isOpen = isOpen
+            if email is not None: canteen.email = email
+            if schedule is not None: canteen.schedule = schedule
+            if tags is not None: canteen.tags = tags
             
             db.commit()
             return CanteenMutationResponse(

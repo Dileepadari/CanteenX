@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
+#from sqlalchemy.dialects.postgresql import JSONB
 from app.core.database import Base
 
 class Canteen(Base):
@@ -15,6 +16,10 @@ class Canteen(Base):
     isOpen = Column(Boolean, default=True)  # Changed from is_open to match frontend
     description = Column(String)
     phone = Column(String)
+    email = Column(String)  # Added email field
+    schedule = Column(JSON)  # Changed to generic JSON for SQLite compatibility
+    tags = Column(JSON)  # Changed to generic JSON for SQLite compatibility
+    
     userId = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # Relationships
