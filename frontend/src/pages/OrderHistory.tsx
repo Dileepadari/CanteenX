@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronRight, Clock, Repeat, Receipt, Loader2, AlertCircle } from "lucide-react";
 import { useQuery } from "@apollo/client";
 import { GET_ALL_ORDERS } from "@/gql/queries/orders";
-import { jwtDecode } from "jwt-decode";
+import { GET_CURRENT_USER } from "@/gql/queries/user";
 import { useToast } from "@/hooks/use-toast";
 
 const OrderHistory = () => {
@@ -17,27 +17,17 @@ const OrderHistory = () => {
   const { toast } = useToast();
   const [userId, setUserId] = useState("");
   const [orders, setOrders] = useState([]);
-  
+
+  // get_current user from graphql
+  const { loading: userLoading, error: userError, data: userData } = useQuery(GET_CURRENT_USER, {
+    fetchPolicy: "network-only",
+  });
   useEffect(() => {
-    // Get user ID from token
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUserId(decoded.user_id);
-      } catch (error) {
-        console.error("Failed to decode token:", error);
-        toast({
-          title: "Authentication Error",
-          description: "Please login again to continue",
-          variant: "destructive",
-        });
-        navigate("/login");
-      }
-    } else {
-      navigate("/login");
+    if (userData && userData.getCurrentUser) {
+      setUserId(userData.getCurrentUser.id);
     }
-  }, [navigate, toast]);
+  }, [userData]);
+
 
   const { loading, error, data } = useQuery(GET_ALL_ORDERS, {
     variables: { userId },
@@ -53,7 +43,7 @@ const OrderHistory = () => {
 
   // Helper function to find menu item by id
   const findMenuItem = (itemId: number) => {
-    return menuItems.find((item) => item.id === itemId);
+    return menuItems.find((item) => parseInt(item.id) === itemId);
   };
 
   // Helper function to find canteen by id
@@ -205,7 +195,7 @@ const OrderHistory = () => {
                           </div>
 
                           {/* Action buttons */}
-                          <div className="bg-gray-50 p-4 flex flex-row sm:flex-col justify-between items-center gap-2 sm:border-l border-gray-100">
+                          {/* <div className="bg-gray-50 p-4 flex flex-row sm:flex-col justify-between items-center gap-2 sm:border-l border-gray-100">
                             <Link to={`/orders/${order.id}/track`} className="w-full">
                               <Button variant="outline" size="sm" className="w-full gap-1">
                                 <Repeat className="h-4 w-4" />
@@ -218,7 +208,7 @@ const OrderHistory = () => {
                                 <ChevronRight className="h-4 w-4" />
                               </Button>
                             </Link>
-                          </div>
+                          </div> */}
                         </div>
                       </CardContent>
                     </Card>

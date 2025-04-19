@@ -9,7 +9,7 @@ import { gql } from "graphql-tag";
  */
 export const CREATE_COMPLAINT = gql`
   mutation CreateComplaint(
-    $userId: Int!,
+    $userId: String!,
     $orderId: Int!,
     $complaintText: String!,
     $heading: String!,
