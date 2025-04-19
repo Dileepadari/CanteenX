@@ -3,6 +3,19 @@ from typing import List, Optional
 from app.models.canteen import Canteen
 from app.core.database import get_db
 
+
+@strawberry.type
+class ScheduleType:
+    breakfast: Optional[str] = None
+    lunch: Optional[str] = None
+    dinner: Optional[str] = None
+    regular: Optional[str] = None
+    evening: Optional[str] = None
+    night: Optional[str] = None
+    weekday: Optional[str] = None
+    weekend: Optional[str] = None
+
+    
 @strawberry.type
 class CanteenType:
     id: int
@@ -16,6 +29,9 @@ class CanteenType:
     description: Optional[str]
     phone: str
     userId: Optional[int]
+    email: Optional[str]
+    schedule: Optional[ScheduleType] = None
+    tags: Optional[List[str]] = None
 
 @strawberry.type
 class CanteenQuery:
@@ -27,6 +43,7 @@ class CanteenQuery:
         return [CanteenType(
             id=canteen.id,
             name=canteen.name,
+            email=canteen.email,
             image=canteen.image,
             location=canteen.location,
             rating=canteen.rating,
@@ -35,7 +52,9 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            userId=canteen.userId
+            userId=canteen.userId,
+            # schedule=canteen.schedule,
+            tags=canteen.tags
         ) for canteen in canteens]
 
     @strawberry.field
@@ -48,6 +67,7 @@ class CanteenQuery:
         return CanteenType(
             id=canteen.id,
             name=canteen.name,
+            email=canteen.email,
             image=canteen.image,
             location=canteen.location,
             rating=canteen.rating,
@@ -56,7 +76,9 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            userId=canteen.userId
+            userId=canteen.userId,
+            # schedule=canteen.schedule,
+            tags=canteen.tags
         )
 
     @strawberry.field
@@ -67,6 +89,7 @@ class CanteenQuery:
         return [CanteenType(
             id=canteen.id,
             name=canteen.name,
+            email=canteen.email,
             image=canteen.image,
             location=canteen.location,
             rating=canteen.rating,
@@ -75,7 +98,9 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            userId=canteen.userId
+            userId=canteen.userId,
+            # schedule=canteen.schedule,
+            tags=canteen.tags
         ) for canteen in canteens]
 
     @strawberry.field
@@ -89,6 +114,7 @@ class CanteenQuery:
         return [CanteenType(
             id=canteen.id,
             name=canteen.name,
+            email=canteen.email,
             image=canteen.image,
             location=canteen.location,
             rating=canteen.rating,
@@ -97,7 +123,9 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            userId=canteen.userId
+            userId=canteen.userId,
+            # schedule=canteen.schedule,
+            tags=canteen.tags
         ) for canteen in canteens]
 
 queries = [
