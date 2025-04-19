@@ -13,7 +13,10 @@ import {
   Truck,
   Phone,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
+import { useQuery } from '@apollo/client';
+import { GET_ORDER_BY_ID } from '@/gql/queries/orders';
 
 // Order status badge component
 const OrderStatusBadge = ({ status, className = '' }) => {
@@ -55,40 +58,29 @@ const OrderStatusBadge = ({ status, className = '' }) => {
 };
 
 const OrderTracking = () => {
-  const { orderId } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const orderId = id;
   const navigate = useNavigate();
   const { toast } = useToast();
   const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  // Load order data from GraphQL query
+  const { loading, error, data } = useQuery(GET_ORDER_BY_ID, {
+    variables: { orderId: parseInt(orderId) },
+    fetchPolicy: "network-only",
+  });
 
-  // Load order data
   useEffect(() => {
-    try {
-      // Load from localStorage for demo
-      const storedOrders = JSON.parse(localStorage.getItem('smartCanteenOrders') || '[]');
-      const orderData = storedOrders.find((o) => o.id === orderId);
-
-      if (orderData) {
-        setOrder(orderData);
-      } else {
-        toast({
-          title: 'Order Not Found',
-          description: 'The requested order could not be found.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error loading order:', error);
+    if (data && data.getOrderById) {
+      setOrder(data.getOrderById);
+    } else if (data && !data.getOrderById) {
       toast({
-        title: 'Error',
-        description: 'Failed to load order details.',
+        title: 'Order Not Found',
+        description: 'The requested order could not be found.',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
     }
-  }, [orderId, toast]);
+  }, [data, toast]);
 
   // Update current time every minute
   useEffect(() => {
@@ -144,9 +136,26 @@ const OrderTracking = () => {
       <MainLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500" />
-            <span className="ml-2">Loading order details...</span>
+            <Loader2 className="h-8 w-8 text-orange-500 animate-spin mr-2" />
+            <span>Loading order details...</span>
           </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center p-8">
+              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+              <h2 className="text-xl font-bold mb-2">Error Loading Order</h2>
+              <p className="text-gray-500 mb-6">{error.message}</p>
+              <Button onClick={() => window.location.reload()}>Try Again</Button>
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
@@ -349,6 +358,7 @@ const OrderTracking = () => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Order Items</h3>
                   <div className="space-y-2 mt-2">
+                    {console.log(order.items)}
                     {order.items.map((item, index) => (
                       <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
                         <div>

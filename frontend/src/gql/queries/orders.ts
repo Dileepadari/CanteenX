@@ -8,7 +8,7 @@ import { gql } from "graphql-tag";
  * Query to fetch orders for a user
  */
 export const GET_USER_ORDERS = gql`
-  query GetUserOrders($userId: Int!) {
+  query GetUserOrders($userId: String!) {
     getUserOrders(userId: $userId) {
       id
       userId
@@ -32,7 +32,12 @@ export const GET_USER_ORDERS = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }
@@ -67,7 +72,12 @@ export const GET_ALL_ORDERS = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }
@@ -102,7 +112,12 @@ export const GET_ACTIVE_ORDERS = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }
@@ -137,7 +152,12 @@ export const GET_CANTEEN_ORDERS = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }
@@ -172,7 +192,12 @@ export const GET_ORDER_BY_ID = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }
@@ -207,7 +232,12 @@ export const GET_ORDERS_BY_STATUS = gql`
       items {
         itemId
         quantity
-        customizations
+        customizations{
+          additions
+          notes
+          removals
+          size
+        }
         note
       }
     }

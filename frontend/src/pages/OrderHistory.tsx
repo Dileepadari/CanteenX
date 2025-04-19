@@ -1,17 +1,56 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
-import { orders, menuItems, canteens, orderStatusOptions } from "@/data/mockData";
+import { menuItems, canteens } from "@/data/mockData";
 import OrderStatusBadge from "@/components/order/OrderStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, Clock, Repeat, Receipt } from "lucide-react";
+import { ChevronRight, Clock, Repeat, Receipt, Loader2, AlertCircle } from "lucide-react";
+import { useQuery } from "@apollo/client";
+import { GET_ALL_ORDERS } from "@/gql/queries/orders";
+import { jwtDecode } from "jwt-decode";
+import { useToast } from "@/hooks/use-toast";
 
 const OrderHistory = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [userId, setUserId] = useState("");
+  const [orders, setOrders] = useState([]);
   
+  useEffect(() => {
+    // Get user ID from token
+    const token = localStorage.getItem("accessToken");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setUserId(decoded.user_id);
+      } catch (error) {
+        console.error("Failed to decode token:", error);
+        toast({
+          title: "Authentication Error",
+          description: "Please login again to continue",
+          variant: "destructive",
+        });
+        navigate("/login");
+      }
+    } else {
+      navigate("/login");
+    }
+  }, [navigate, toast]);
+
+  const { loading, error, data } = useQuery(GET_ALL_ORDERS, {
+    variables: { userId },
+    skip: !userId,
+    fetchPolicy: "network-only",
+  });
+
+  useEffect(() => {
+    if (data && data.getAllOrders) {
+      setOrders(data.getAllOrders);
+    }
+  }, [data]);
+
   // Helper function to find menu item by id
   const findMenuItem = (itemId: number) => {
     return menuItems.find((item) => item.id === itemId);
@@ -49,15 +88,45 @@ const OrderHistory = () => {
     navigate("/menu");
   };
 
-  // Active orders (preparing, ready)
+  // Active orders (pending, preparing, ready)
   const activeOrders = orders.filter(
-    (order) => order.status === "preparing" || order.status === "ready"
+    (order) => ["pending", "confirmed", "preparing", "ready"].includes(order.status)
   );
 
   // Past orders (delivered, cancelled)
   const pastOrders = orders.filter(
-    (order) => order.status === "delivered" || order.status === "cancelled"
+    (order) => ["delivered", "cancelled"].includes(order.status)
   );
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8 flex justify-center items-center h-[50vh]">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-10 w-10 text-orange-500 animate-spin mb-4" />
+            <h3 className="text-lg font-semibold">Loading orders...</h3>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="inline-flex h-20 w-20 rounded-full bg-red-100 p-4 items-center justify-center mb-4">
+              <AlertCircle className="h-10 w-10 text-red-500" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Error loading orders</h3>
+            <p className="text-gray-500 mb-4">{error.message}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -112,12 +181,12 @@ const OrderHistory = () => {
                             <div className="mt-3">
                               <h4 className="text-sm font-medium mb-2">Items</h4>
                               <ul className="space-y-1">
-                                {order.items.map((item) => {
+                                {order.items.map((item, idx) => {
                                   const menuItem = findMenuItem(item.itemId);
                                   return (
-                                    <li key={item.itemId} className="text-sm flex justify-between">
+                                    <li key={idx} className="text-sm flex justify-between">
                                       <span>
-                                        {item.quantity} × {menuItem?.name || "Unknown Item"}
+                                        {item.quantity} × {menuItem?.name || "Item #" + item.itemId}
                                       </span>
                                       <span className="text-gray-600">
                                         ₹{menuItem ? item.quantity * menuItem.price : 0}
@@ -137,10 +206,12 @@ const OrderHistory = () => {
 
                           {/* Action buttons */}
                           <div className="bg-gray-50 p-4 flex flex-row sm:flex-col justify-between items-center gap-2 sm:border-l border-gray-100">
-                            <Button variant="outline" size="sm" className="w-full gap-1">
-                              <Repeat className="h-4 w-4" />
-                              Track
-                            </Button>
+                            <Link to={`/orders/${order.id}/track`} className="w-full">
+                              <Button variant="outline" size="sm" className="w-full gap-1">
+                                <Repeat className="h-4 w-4" />
+                                Track
+                              </Button>
+                            </Link>
                             <Link to={`/orders/${order.id}`} className="w-full">
                               <Button size="sm" className="w-full gap-1">
                                 Details
@@ -199,12 +270,12 @@ const OrderHistory = () => {
                             <div className="mt-3">
                               <h4 className="text-sm font-medium mb-2">Items</h4>
                               <ul className="space-y-1">
-                                {order.items.map((item) => {
+                                {order.items.map((item, idx) => {
                                   const menuItem = findMenuItem(item.itemId);
                                   return (
-                                    <li key={item.itemId} className="text-sm flex justify-between">
+                                    <li key={idx} className="text-sm flex justify-between">
                                       <span>
-                                        {item.quantity} × {menuItem?.name || "Unknown Item"}
+                                        {item.quantity} × {menuItem?.name || "Item #" + item.itemId}
                                       </span>
                                       <span className="text-gray-600">
                                         ₹{menuItem ? item.quantity * menuItem.price : 0}

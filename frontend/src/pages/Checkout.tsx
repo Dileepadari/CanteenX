@@ -71,6 +71,7 @@ const Checkout = () => {
 
         if (data?.getCartByUserId) {
           setCartItems(data.getCartByUserId.items || []);
+          console.log(data.getCartByUserId.items)
           if (data.getCartByUserId.items[0].canteenId) {
             setCanteenId(data.getCartByUserId?.items[0]?.canteenId);
           }
@@ -135,7 +136,12 @@ const Checkout = () => {
       const orderItems = cartItems.map(item => ({
         itemId: parseInt(item.menuItemId || item.id, 10),
         quantity: item.quantity,
-        customizations: item.customizations || null,
+        customizations: {
+          size: item.customizations?.size || null,
+          additions: item.customizations?.additions || null,
+          removals: item.customizations?.removals || null,
+          notes: item.customizations?.notes || null
+        },
         note: item.specialInstructions || ""
       }));
 
