@@ -23,7 +23,7 @@ export const LOGIN_MUTATION = gql`
 
 export const UPDATE_USER_PROFILE = gql`
   mutation UpdateUserProfile(
-    $userId: Int!,
+    $userId: String!,
     $name: String,
     $email: String
   ) {

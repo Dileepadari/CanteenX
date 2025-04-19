@@ -50,7 +50,7 @@ class Order(Base):
 class OrderStep(Base):
     __tablename__ = "order_steps"
     id = Column(Integer, primary_key=True, index=True)
-    orderId = Column(String, ForeignKey("orders.id"))
+    orderId = Column(Integer, ForeignKey("orders.id"))
     status = Column(String, nullable=False)
     description = Column(String, nullable=False)
     time = Column(String, nullable=True)

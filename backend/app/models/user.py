@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, JSON
-from app.core.base import Base  # Import Base from the new module
+from app.core.database import Base  # Correct the import
 from sqlalchemy.orm import relationship
 
 class User(Base):

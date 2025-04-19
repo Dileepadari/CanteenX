@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, ShoppingCart, CheckCircle, AlertTriangle, MenuSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { menuItems } from '@/data/mockData';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const VendorDashboard = () => {
   const navigate = useNavigate();

@@ -19,8 +19,8 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(String, ForeignKey("orders.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     merchant_id = Column(Integer, ForeignKey("merchants.id"), nullable=False)
     amount = Column(Float, nullable=False)
     payment_method = Column(String, nullable=False)
@@ -59,7 +59,7 @@ class UserWallet(Base):
     __tablename__ = "user_wallets"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True)
     balance = Column(Float, default=0.0)
     is_privileged = Column(Boolean, default=False)
     credit_limit = Column(Float, default=0.0)

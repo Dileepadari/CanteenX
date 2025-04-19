@@ -402,21 +402,21 @@ def add_mock_orders(db: Session):
     order_items = [
         OrderItem(
             orderId=active_order.id,
-            itemId=1,
+            itemId=101,
             quantity=1,
             customizations=json.dumps(["Extra Butter", "Medium Spicy"]),
             note="Make it extra creamy"
         ),
         OrderItem(
             orderId=active_order.id,
-            itemId=2,
+            itemId=102,
             quantity=2,
             customizations=json.dumps([]),
             note=""
         ),
         OrderItem(
             orderId=active_order.id,
-            itemId=3,
+            itemId=103,
             quantity=1,
             customizations=json.dumps(["Large Portion"]),
             note=""
@@ -474,21 +474,21 @@ def add_mock_orders(db: Session):
     history_items1 = [
         OrderItem(
             orderId=order_history1.id,
-            itemId=1,
+            itemId=101,
             quantity=1,
             customizations=json.dumps(["Extra Spicy", "Regular Portion"]),
             note=""
         ),
         OrderItem(
             orderId=order_history1.id,
-            itemId=2,
+            itemId=102,
             quantity=2,
             customizations=json.dumps([]),
             note=""
         ),
         OrderItem(
             orderId=order_history1.id,
-            itemId=3,
+            itemId=103,
             quantity=1,
             customizations=json.dumps([]),
             note=""
@@ -499,21 +499,21 @@ def add_mock_orders(db: Session):
     history_items2 = [
         OrderItem(
             orderId=order_history2.id,
-            itemId=4,
+            itemId=104,
             quantity=1,
             customizations=json.dumps(["No Onions", "Extra Cheese"]),
             note=""
         ),
         OrderItem(
             orderId=order_history2.id,
-            itemId=5,
+            itemId=101,
             quantity=1,
             customizations=json.dumps(["Extra Salt"]),
             note=""
         ),
         OrderItem(
             orderId=order_history2.id,
-            itemId=3,
+            itemId=103,
             quantity=1,
             customizations=json.dumps([]),
             note=""
@@ -524,28 +524,28 @@ def add_mock_orders(db: Session):
     history_items3 = [
         OrderItem(
             orderId=order_history3.id,
-            itemId=1,
+            itemId=101,
             quantity=1,
             customizations=json.dumps(["Extra Veggies"]),
             note=""
         ),
         OrderItem(
             orderId=order_history3.id,
-            itemId=2,
+            itemId=102,
             quantity=1,
             customizations=json.dumps(["Dry", "Extra Spicy"]),
             note=""
         ),
         OrderItem(
             orderId=order_history3.id,
-            itemId=3,
+            itemId=103,
             quantity=1,
             customizations=json.dumps([]),
             note=""
         ),
         OrderItem(
             orderId=order_history3.id,
-            itemId=4,
+            itemId=104,
             quantity=1,
             customizations=json.dumps(["No Eggs"]),
             note=""
