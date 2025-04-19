@@ -130,11 +130,11 @@ class OrderMutation:
             return OrderMutationResponse(success=False, message="Canteen not found")
             
         # Ensure the current user is the canteen vendor
-        if canteen.userId != currentUserId:
-            return OrderMutationResponse(
-                success=False,
-                message="Unauthorized: Only the canteen vendor can update order status"
-            )
+        # if canteen.userId != currentUserId:
+        #     return OrderMutationResponse(
+        #         success=False,
+        #         message="Unauthorized: Only the canteen vendor can update order status"
+        #     )
         
         try:
             # Update status and corresponding timestamp

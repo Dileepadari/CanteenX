@@ -11,6 +11,7 @@ from app.models.user_types import UserType  # Import from a central location
 from app.mutations.cart_mutations import CartMutation, CartMutationResponse
 from app.mutations.order_mutations import OrderMutation, OrderMutationResponse
 import strawberry
+from app.mutations.menu_mutations import MenuMutation,MenuItemMutationResponse
 
 @strawberry.type
 class LoginResponse:
@@ -105,3 +106,6 @@ class RootMutation:
     update_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.update_order)
     cancel_order: OrderMutationResponse = strawberry.field(resolver=OrderMutation.cancel_order)
     update_payment_status: OrderMutationResponse = strawberry.field(resolver=OrderMutation.update_payment_status)
+    createMenuItem: MenuItemMutationResponse = strawberry.field(resolver=MenuMutation.create_menu_item)
+    updateMenuItem: MenuItemMutationResponse = strawberry.field(resolver=MenuMutation.update_menu_item)
+    deleteMenuItem: MenuItemMutationResponse = strawberry.field(resolver=MenuMutation.delete_menu_item)

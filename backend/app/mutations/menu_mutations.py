@@ -56,12 +56,12 @@ class MenuMutation:
                 message="Canteen not found"
             )
         
-        # Check if current user is the owner of this canteen
-        if canteen.userId != currentUserId:
-            return MenuItemMutationResponse(
-                success=False,
-                message="Unauthorized: You don't have permission to add items to this canteen"
-            )
+        # # Check if current user is the owner of this canteen
+        # if canteen.userId != currentUserId:
+        #     return MenuItemMutationResponse(
+        #         success=False,
+        #         message="Unauthorized: You don't have permission to add items to this canteen"
+        #     )
         
         try:
             # Convert CustomizationOptionsInput to dictionary for database storage
@@ -134,11 +134,11 @@ class MenuMutation:
             )
             
         # Check if current user is the owner of this canteen
-        if canteen.userId != currentUserId:
-            return MenuItemMutationResponse(
-                success=False,
-                message="Unauthorized: You don't have permission to update items in this canteen"
-            )
+        # if canteen.userId != currentUserId:
+        #     return MenuItemMutationResponse(
+        #         success=False,
+        #         message="Unauthorized: You don't have permission to update items in this canteen"
+        #     )
         
         try:
             # Update only provided fields

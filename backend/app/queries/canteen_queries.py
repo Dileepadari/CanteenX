@@ -4,17 +4,6 @@ from app.models.canteen import Canteen
 from app.core.database import get_db
 
 @strawberry.type
-class ScheduleType:
-    breakfast: Optional[str] = None
-    lunch: Optional[str] = None
-    dinner: Optional[str] = None
-    regular: Optional[str] = None
-    evening: Optional[str] = None
-    night: Optional[str] = None
-    weekday: Optional[str] = None
-    weekend: Optional[str] = None
-
-@strawberry.type
 class CanteenType:
     id: int
     name: str
@@ -26,10 +15,7 @@ class CanteenType:
     isOpen: bool
     description: Optional[str]
     phone: str
-    email: Optional[str]
-    schedule: Optional[ScheduleType]
-    tags: Optional[List[str]]
-    userId: Optional[str]
+    userId: Optional[int]
 
 @strawberry.type
 class CanteenQuery:
@@ -49,9 +35,6 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            email=canteen.email,
-            schedule=ScheduleType(**canteen.schedule) if canteen.schedule else None,
-            tags=canteen.tags,
             userId=canteen.userId
         ) for canteen in canteens]
 
@@ -60,6 +43,8 @@ class CanteenQuery:
         """Get a specific canteen by ID"""
         db = next(get_db())
         canteen = db.query(Canteen).filter(Canteen.id == id).first()
+        if not canteen:
+            return None
         return CanteenType(
             id=canteen.id,
             name=canteen.name,
@@ -71,11 +56,8 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            email=canteen.email,
-            schedule=ScheduleType(**canteen.schedule) if canteen.schedule else None,
-            tags=canteen.tags,
             userId=canteen.userId
-        ) if canteen else None
+        )
 
     @strawberry.field
     def get_open_canteens(self) -> List[CanteenType]:
@@ -93,14 +75,34 @@ class CanteenQuery:
             isOpen=canteen.isOpen,
             description=canteen.description,
             phone=canteen.phone,
-            email=canteen.email,
-            schedule=ScheduleType(**canteen.schedule) if canteen.schedule else None,
-            tags=canteen.tags,
             userId=canteen.userId
         ) for canteen in canteens]
 
+    @strawberry.field
+    def search_canteens(self, query: str) -> List[CanteenType]:
+        """Search canteens by name or location"""
+        db = next(get_db())
+        canteens = db.query(Canteen).filter(
+            (Canteen.name.ilike(f"%{query}%")) |
+            (Canteen.location.ilike(f"%{query}%"))
+        ).all()
+        return [CanteenType(
+            id=canteen.id,
+            name=canteen.name,
+            image=canteen.image,
+            location=canteen.location,
+            rating=canteen.rating,
+            openTime=canteen.openTime,
+            closeTime=canteen.closeTime,
+            isOpen=canteen.isOpen,
+            description=canteen.description,
+            phone=canteen.phone,
+            userId=canteen.userId
+        ) for canteen in canteens]
 
 queries = [
     strawberry.field(name="getAllCanteens", resolver=CanteenQuery.get_all_canteens),
     strawberry.field(name="getCanteenById", resolver=CanteenQuery.get_canteen_by_id),
-    strawberry.field(name="getOpenCanteens", resolver=CanteenQuery.get_open_canteens),]
+    strawberry.field(name="getOpenCanteens", resolver=CanteenQuery.get_open_canteens),
+    strawberry.field(name="searchCanteens", resolver=CanteenQuery.search_canteens),
+]

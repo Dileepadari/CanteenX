@@ -77,7 +77,7 @@ export const UPDATE_CANTEEN = gql`
 export const DELETE_CANTEEN = gql`
   mutation DeleteCanteen(
     $canteenId: Int!,
-    $currUserId: Int!
+    $currUserId: String!
   ) {
     deleteCanteen(
       canteenId: $canteenId,
