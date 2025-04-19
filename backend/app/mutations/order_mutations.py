@@ -9,6 +9,7 @@ from app.core.database import get_db
 import json
 from sqlalchemy.orm import Session
 from app.schemas.common import CustomizationsInput
+from app.mutations.cart_mutations import CartMutation
 
 @strawberry.type
 class OrderMutationResponse:
@@ -93,6 +94,8 @@ class OrderMutation:
                 pickupTime=pickupTime
             )
             db.add(new_order)
+            cart_mutation = CartMutation()
+            cart_mutation.clear_cart(userId)
             db.commit()
             
             return OrderMutationResponse(

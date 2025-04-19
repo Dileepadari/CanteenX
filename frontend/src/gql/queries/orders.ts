@@ -48,7 +48,7 @@ export const GET_USER_ORDERS = gql`
  * Query to fetch all orders for a user
  */
 export const GET_ALL_ORDERS = gql`
-  query GetAllOrders($userId: Int!) {
+  query GetAllOrders($userId: String!) {
     getAllOrders(userId: $userId) {
       id
       userId
@@ -88,7 +88,7 @@ export const GET_ALL_ORDERS = gql`
  * Query to fetch active orders for a user
  */
 export const GET_ACTIVE_ORDERS = gql`
-  query GetActiveOrders($userId: Int!) {
+  query GetActiveOrders($userId: String!) {
     getActiveOrders(userId: $userId) {
       id
       userId

@@ -2,8 +2,8 @@ import { gql } from "graphql-tag";
 
 export const CREATE_CANTEEN = gql`
   mutation CreateCanteen(
-    $currUserId: Int!,
-    $userId: Int!,
+    $currUserId: String!,
+    $userId: String!,
     $name: String!,
     $location: String!,
     $phone: String!,
@@ -39,7 +39,7 @@ export const CREATE_CANTEEN = gql`
 export const UPDATE_CANTEEN = gql`
   mutation UpdateCanteen(
     $canteenId: Int!,
-    $userId: Int!,
+    $userId: String!,
     $name: String,
     $location: String,
     $phone: String,
@@ -93,7 +93,7 @@ export const UPDATE_CANTEEN_STATUS = gql`
   mutation UpdateCanteenStatus(
     $canteenId: Int!,
     $isOpen: Boolean!,
-    $userId: Int!
+    $userId: String!
   ) {
     updateCanteenStatus(
       canteenId: $canteenId,

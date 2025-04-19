@@ -44,7 +44,7 @@ export const UPDATE_USER_PROFILE = gql`
  */
 export const UPDATE_FAVORITE_CANTEENS = gql`
   mutation UpdateFavoriteCanteens(
-    $userId: Int!,
+    $userId: String!,
     $canteenIds: [Int!]!
   ) {
     updateFavoriteCanteens(
@@ -63,7 +63,7 @@ export const UPDATE_FAVORITE_CANTEENS = gql`
  */
 export const DEACTIVATE_USER = gql`
   mutation DeactivateUser(
-    $userId: Int!,
+    $userId: String!,
     $adminId: Int!
   ) {
     deactivateUser(

@@ -6,7 +6,7 @@ export const CREATE_MENU_ITEM = gql`
     $price: Float!,
     $canteenId: Int!,
     $canteenName: String!,
-    $currentUserId: Int!,
+    $currentUserId: String!,
     $description: String,
     $image: String,
     $category: String,
@@ -39,7 +39,7 @@ export const CREATE_MENU_ITEM = gql`
 export const UPDATE_MENU_ITEM = gql`
   mutation UpdateMenuItem(
     $itemId: Int!,
-    $currentUserId: Int!,
+    $currentUserId: String!,
     $name: String,
     $price: Float,
     $description: String,
@@ -73,7 +73,7 @@ export const UPDATE_MENU_ITEM = gql`
 export const DELETE_MENU_ITEM = gql`
   mutation DeleteMenuItem(
     $itemId: Int!,
-    $currentUserId: Int!
+    $currentUserId: String!
   ) {
     deleteMenuItem(
       itemId: $itemId,
