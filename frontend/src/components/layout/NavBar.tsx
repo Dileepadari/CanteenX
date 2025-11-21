@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -38,21 +38,27 @@ const NavBar = () => {
   const isVendor = roleLower === 'vendor';
   const isAdmin = roleLower === 'admin' || roleLower === 'administrator';
 
+  // Close the sheet when route changes (improves UX on navigation)
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <header className="sticky top-0 z-50 w-full backdrop-blur-sm bg-background/90 border-b border-border">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center">
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2" aria-label="Home">
             <span className="text-2xl font-bold text-primary">Smart</span>
             <span className="text-2xl font-bold text-secondary">Canteen</span>
           </Link>
         </div>
 
-        <nav className="hidden md:flex md:items-center md:space-x-4 lg:space-x-6">
+        {/* Show full nav only on large screens and above */}
+        <nav className="hidden lg:flex lg:items-center lg:space-x-4 xl:space-x-6" aria-label="Primary">
           <NavLinks role={user?.role} isVendor={isVendor} />
         </nav>
 
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           {isVendor ? <VendorNotifications /> : <UserNotifications />}
 
           {!isVendor && (
@@ -115,22 +121,30 @@ const NavBar = () => {
             </Button>
           )}
 
+          {/* Hamburger visible below large screens (phones + tablets) */}
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="md:hidden">
+              <Button
+                variant="outline"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Toggle navigation menu"
+                aria-haspopup="true"
+                aria-expanded={isMenuOpen}
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right">
-              <div className="py-4">
+            <SheetContent side="left" className="w-72 sm:w-80" aria-label="Mobile navigation">
+              <div className="py-4 h-full flex flex-col">
                 <Link
                   to="/"
-                  className="flex items-center space-x-2 mb-6"
+                  className="flex items-center space-x-2 mb-6 focus:outline-none focus:ring-2 focus:ring-primary rounded-md"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <span className="text-lg font-semibold">CanteenX</span>
                 </Link>
-                <nav className="flex flex-col space-y-4">
+                <nav className="flex-1 overflow-y-auto" aria-label="Mobile primary">
                   <NavLinks
                     role={user?.role}
                     isVendor={isVendor}

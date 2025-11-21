@@ -1,20 +1,16 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  Store, 
-  ShoppingCart, 
-  Clock, 
-  MessagesSquare, 
-  User,
+import {
+  Home,
+  Store,
   LayoutDashboard,
   ClipboardList,
   MenuSquare,
-  Tags, 
-  BarChart, 
+  Tags,
+  BarChart,
   Settings,
-  PackageOpen
+  PackageOpen,
+  User
 } from 'lucide-react';
 
 interface NavLinksProps {
@@ -25,31 +21,31 @@ interface NavLinksProps {
 }
 
 const NavLinks: React.FC<NavLinksProps> = ({ role, isVendor = false, isMobile = false, onItemClick = () => {} }) => {
-  const linkClasses = "flex items-center py-2 px-4 text-gray-700 hover:bg-muted rounded-md transition-colors";
+  const linkClasses = "flex items-center py-2 px-4 text-gray-700 hover:bg-muted rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40";
   const activeLinkClasses = "bg-muted text-primary font-medium";
   const iconClasses = "h-5 w-5 mr-3";
-  
+
   const userLinks = [
-    { path: "/", label: "Home", icon: <Home className={iconClasses} /> },
-    { path: "/canteens", label: "Canteens", icon: <Store className={iconClasses} /> },
-    { path: "/menu", label: "Menu", icon: <MenuSquare className={iconClasses} /> },
+    { path: "/", label: "Home", icon: <Home aria-hidden className={iconClasses} /> },
+    { path: "/canteens", label: "Canteens", icon: <Store aria-hidden className={iconClasses} /> },
+    { path: "/menu", label: "Menu", icon: <MenuSquare aria-hidden className={iconClasses} /> },
   ];
 
   const adminLinks = [
-    { path: "/admin/dashboard", label: "Admin", icon: <LayoutDashboard className={iconClasses} /> },
-    { path: "/admin/canteens", label: "Canteens", icon: <Store className={iconClasses} /> },
-    { path: "/admin/vendors", label: "Vendors", icon: <User className={iconClasses} /> },
-    { path: "/admin/complaints", label: "Complaints", icon: <ClipboardList className={iconClasses} /> },
+    { path: "/admin/dashboard", label: "Admin", icon: <LayoutDashboard aria-hidden className={iconClasses} /> },
+    { path: "/admin/canteens", label: "Canteens", icon: <Store aria-hidden className={iconClasses} /> },
+    { path: "/admin/vendors", label: "Vendors", icon: <User aria-hidden className={iconClasses} /> },
+    { path: "/admin/complaints", label: "Complaints", icon: <ClipboardList aria-hidden className={iconClasses} /> },
   ];
 
   const vendorLinks = [
-    { path: "/vendor/dashboard", label: "Dashboard", icon: <LayoutDashboard className={iconClasses} /> },
-    { path: "/vendor/orders", label: "Orders", icon: <ClipboardList className={iconClasses} /> },
-    { path: "/vendor/menu", label: "Menu", icon: <MenuSquare className={iconClasses} /> },
-    { path: "/vendor/promotions", label: "Promotions", icon: <Tags className={iconClasses} /> },
-    { path: "/vendor/analytics", label: "Analytics", icon: <BarChart className={iconClasses} /> },
-    { path: "/vendor/bulk-orders", label: "Bulk Orders", icon: <PackageOpen className={iconClasses} /> },
-    { path: "/vendor/settings", label: "Settings", icon: <Settings className={iconClasses} /> },
+    { path: "/vendor/dashboard", label: "Dashboard", icon: <LayoutDashboard aria-hidden className={iconClasses} /> },
+    { path: "/vendor/orders", label: "Orders", icon: <ClipboardList aria-hidden className={iconClasses} /> },
+    { path: "/vendor/menu", label: "Menu", icon: <MenuSquare aria-hidden className={iconClasses} /> },
+    { path: "/vendor/promotions", label: "Promotions", icon: <Tags aria-hidden className={iconClasses} /> },
+    { path: "/vendor/analytics", label: "Analytics", icon: <BarChart aria-hidden className={iconClasses} /> },
+    { path: "/vendor/bulk-orders", label: "Bulk Orders", icon: <PackageOpen aria-hidden className={iconClasses} /> },
+    { path: "/vendor/settings", label: "Settings", icon: <Settings aria-hidden className={iconClasses} /> },
   ];
 
   const roleLower = role?.toLowerCase?.() || '';
@@ -61,20 +57,24 @@ const NavLinks: React.FC<NavLinksProps> = ({ role, isVendor = false, isMobile = 
   else if (resolvedIsVendor) links = vendorLinks;
 
   return (
-    // display flex
-    <nav className={`flex space-y-1 space-x-1 ${isMobile ? 'py-4' : ''}`}>
+    <nav
+      aria-label={isMobile ? "Mobile primary navigation" : "Primary navigation"}
+      className={
+        `${isMobile ? "flex flex-col space-y-1" : "flex items-center space-x-2"} ${isMobile ? 'py-2' : ''}`
+      }
+    >
       {links.map((link) => (
         <NavLink
           key={link.path}
           to={link.path}
-          className={({ isActive }) => 
+          className={({ isActive }) =>
             `${linkClasses} ${isActive ? activeLinkClasses : ""}`
           }
           onClick={onItemClick}
           end={link.path === "/"}
         >
           {link.icon}
-          {link.label}
+          <span>{link.label}</span>
         </NavLink>
       ))}
     </nav>
