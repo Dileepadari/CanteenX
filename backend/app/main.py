@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from fastapi import FastAPI, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,7 +49,16 @@ async def get_context(
     }
 
 # Initialize the GraphQL router with the schema and the corrected context getter.
-graphql_app = GraphQLRouter(schema=schema, context_getter=get_context)
+IS_PROD = os.getenv("ENV", "").lower() == "production"
+# When ENV=production:
+# - GraphiQL playground is disabled (graphiql=False)
+# - Introspection is disabled via schema config in schema.py (if supported by installed Strawberry version)
+# Set ENV=production in your process environment for deployment to enforce these hardening measures.
+graphql_app = GraphQLRouter(
+    schema=schema,
+    context_getter=get_context,
+    graphiql=not IS_PROD  # Disable GraphiQL playground in production
+)
 
 # Initialize the main FastAPI application.
 app = FastAPI()
@@ -64,13 +74,11 @@ app.add_middleware(
         "http://localhost:8080",
         "http://localhost:3000",
         "https://smartcanteen.dileepadari.dev",
-        "https://*.dileepadari.dev",
-        "https://canteen-x-kappa.vercel.app/",
-        "https://canteen-x-kappa.vercel.app"
-    ],
+        "https://canteen-x-kappa.vercel.app",
+    ],  # tighten wildcard domains in production; expand only if necessary
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "OPTIONS"],  # GraphQL typically needs only POST + preflight
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Include the GraphQL router in your FastAPI application.

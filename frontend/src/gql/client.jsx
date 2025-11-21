@@ -9,13 +9,6 @@ const GRAPHQL_ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT || '/api/graphql'
 // If API_URL is empty, it will use relative path (useful when served from same origin)
 const graphqlUri = API_URL ? `${API_URL}${GRAPHQL_ENDPOINT}` : GRAPHQL_ENDPOINT;
 
-console.log('🚀 GraphQL Client Configuration:', {
-    API_URL,
-    GRAPHQL_ENDPOINT,
-    graphqlUri,
-    environment: import.meta.env.VITE_ENVIRONMENT || 'production'
-});
-
 const client = new ApolloClient({
     uri: graphqlUri,
     cache: new InMemoryCache(),
