@@ -409,7 +409,7 @@ const VendorAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    <PieChart data={getCategoryData() || categoryData} />
+                    <PieChart data={getCategoryData()} />
                   </div>
                 </CardContent>
               </Card>
@@ -446,7 +446,7 @@ const VendorAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    <BarChart data={getTopItemsData() || topItemsData} />
+                    <BarChart data={getTopItemsData()} />
                   </div>
                 </CardContent>
               </Card>

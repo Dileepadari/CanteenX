@@ -10,6 +10,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'a
 
 from app.core.database import engine, Base  # noqa: E402
 
+# Import all models so Alembic can detect them for autogenerate
+from app.models import user, canteen, menu_item, cart, order, complaints, payment  # noqa: E402, F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

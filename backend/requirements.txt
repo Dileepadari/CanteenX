@@ -28,3 +28,4 @@ razorpay==1.3.0
 psycopg2-binary>=2.9
 cryptography==3.4.8
 python-cas==1.6.0
+python-dotenv==1.0.0

@@ -1,4 +1,4 @@
-import AdminLayout from '@/components/layout/AdminLayout';
+import AdminLayout from '../../components/layout/AdminLayout';
 import { useQuery } from '@apollo/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
