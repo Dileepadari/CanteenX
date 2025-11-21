@@ -60,7 +60,14 @@ app.add_middleware(AuthMiddleware)
 # Best Practice Note: In production, these origins should be loaded from environment variables.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:3000", "https://smartcanteen.dileepadari.dev", "https://*.dileepadari.dev", "https://canteen-x-kappa.vercel.app/"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "https://smartcanteen.dileepadari.dev",
+        "https://*.dileepadari.dev",
+        "https://canteen-x-kappa.vercel.app/",
+        "https://canteen-x-kappa.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
