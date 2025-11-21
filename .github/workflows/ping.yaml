@@ -1,0 +1,17 @@
+name: Ping backend on render to stay alive
+
+on:
+  schedule:
+    # every 14 minutes
+    - cron: '*/14 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping backend
+        run: |
+            curl -X OPTIONS https://canteenx.onrender.com/api/awake
+
