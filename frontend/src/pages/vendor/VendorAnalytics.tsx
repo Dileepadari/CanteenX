@@ -344,8 +344,8 @@ const VendorAnalytics = () => {
                     <span>3% from last month</span>
                   </div>
                 </div>
-                <div className="p-3 bg-orange-50 rounded-full">
-                  <Users className="h-6 w-6 text-orange-500" />
+                <div className="p-3 bg-muted/10 rounded-full">
+                  <Users className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </CardContent>

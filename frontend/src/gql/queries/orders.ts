@@ -31,6 +31,8 @@ export const GET_USER_ORDERS = gql`
       isPreOrder
       items {
         itemId
+        name
+        price
         quantity
         customizations{
           additions
@@ -71,6 +73,8 @@ export const GET_ALL_ORDERS = gql`
       isPreOrder
       items {
         itemId
+        name
+        price
         quantity
         customizations{
           additions
@@ -111,6 +115,8 @@ export const GET_ACTIVE_ORDERS = gql`
       isPreOrder
       items {
         itemId
+        name
+        price
         quantity
         customizations{
           additions
@@ -151,6 +157,8 @@ export const GET_CANTEEN_ORDERS = gql`
       isPreOrder
       items {
         itemId
+        name
+        price
         quantity
         customizations{
           additions
@@ -173,6 +181,8 @@ export const GET_ORDER_BY_ID = gql`
       id
       userId
       canteenId
+      subtotal
+      tax
       totalAmount
       status
       orderTime

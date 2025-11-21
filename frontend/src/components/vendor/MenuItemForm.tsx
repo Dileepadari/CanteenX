@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
 
 interface MenuItemFormProps {
   open: boolean;
@@ -187,10 +188,11 @@ const MenuItemForm = ({ open, onOpenChange, item, onSave }: MenuItemFormProps) =
             />
             {formData.image && (
               <div className="mt-2">
-                <img 
-                  src={formData.image} 
-                  alt="Preview" 
-                  className="h-24 w-auto object-cover rounded-md" 
+                <img
+                  src={ensureImageSrc(formData.image, formData.name || 'preview', 240, 160)}
+                  alt="Preview"
+                  className="h-24 w-auto object-cover rounded-md"
+                  onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(formData.name || 'preview', 240, 160); }}
                 />
               </div>
             )}

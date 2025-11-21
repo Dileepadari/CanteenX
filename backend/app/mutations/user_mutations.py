@@ -1,207 +1,106 @@
 import strawberry
 from typing import List, Optional
-from app.models.user import User
-from app.core.database import get_db
+from passlib.context import CryptContext
+import uuid
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from strawberry.types import Info
+from graphql import GraphQLError
+
+from app.models.user import User, UserType, RegisterUserInput, UpdateUserProfileInput
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @strawberry.type
-class UserMutationResponse:
-    success: bool
-    message: str
-    userId: Optional[str] = None
-    token: Optional[str] = None
-
-@strawberry.type
-class UserMutation:
+class UserMutations:
     @strawberry.mutation
-    def create_user(
-        self,
-        name: str,
-        email: str,
-        password: str = "password",  # Default password, not actually used
-        role: str = "student",
-    ) -> UserMutationResponse:
-        """Create a new user"""
-        db = next(get_db())
+    def register_user(self, info: Info, input: RegisterUserInput) -> UserType:
+        """
+        Registers a new user. The role is defaulted to 'student'.
+        Raises an error if the username or email is already taken.
+        """
+        db: Session = info.context["db"]
+
+        # Check for existing user
+        existing_user = db.query(User).filter(
+            (User.email == input.email) | (User.name == input.username)
+        ).first()
+        if existing_user:
+            raise GraphQLError("User with this email or username already exists.")
+
+        # Always hash the password
+        hashed_password = pwd_context.hash(input.password)
         
-        # Check if user already exists
-        if db.query(User).filter(User.email == email).first():
-            return UserMutationResponse(
-                success=False,
-                message="User with this email already exists"
-            )
-            
+        new_user = User(
+            id=str(uuid.uuid4()),
+            name=input.username,
+            email=input.email,
+            password=hashed_password,
+            role="student" # Default role for security
+        )
+
         try:
-            # Simple storage of password as placeholder
-            new_user = User(
-                name=name,
-                email=email,
-                role=role,
-                password=password,  # Just store password directly as placeholder
-                favoriteCanteens=[],
-                recentOrders=[]
-            )
             db.add(new_user)
             db.commit()
-            return UserMutationResponse(
-                success=True,
-                message="User created successfully",
-                userId=str(new_user.id)
-            )
-        except Exception as e:
+            db.refresh(new_user)
+        except IntegrityError:
             db.rollback()
-            return UserMutationResponse(
-                success=False,
-                message=f"Failed to create user: {str(e)}"
-            )
+            raise GraphQLError("A database error occurred. The username or email might be taken.")
+        
+        return new_user
 
     @strawberry.mutation
-    def update_user_profile(
-        self,
-        userId: str,
-        name: Optional[str] = None,
-        email: Optional[str] = None,
-    ) -> UserMutationResponse:
-        """Update user profile"""
-        db = next(get_db())
-        user = db.query(User).filter(User.id == userId).first()
+    def update_user_profile(self, info: Info, input: UpdateUserProfileInput) -> UserType:
+        """Updates the profile of the currently authenticated user."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("Authentication required.")
+
+        update_data = {k: v for k, v in input.__dict__.items() if v is not strawberry.UNSET}
+        if not update_data:
+            raise GraphQLError("No update data provided.")
+
+        for key, value in update_data.items():
+            if key == 'email':
+                # Check if the new email is already taken by another user
+                if db.query(User).filter(User.email == value, User.id != current_user.id).first():
+                    raise GraphQLError("This email is already taken by another user.")
+                current_user.email = value
+            elif key == 'password':
+                # Always hash the new password
+                current_user.password = pwd_context.hash(value)
+            else:
+                setattr(current_user, key, value)
         
-        if not user:
-            return UserMutationResponse(success=False, message="User not found")
-            
-        try:
-            if name:
-                user.name = name
-            if email and email != user.email:
-                # Check if email is already taken
-                if db.query(User).filter(User.email == email).first():
-                    return UserMutationResponse(
-                        success=False,
-                        message="Email is already taken"
-                    )
-                user.email = email
-                
-            db.commit()
-            return UserMutationResponse(
-                success=True,
-                message="Profile updated successfully",
-                userId=str(user.id)
-            )
-        except Exception as e:
-            db.rollback()
-            return UserMutationResponse(
-                success=False,
-                message=f"Failed to update profile: {str(e)}"
-            )
+        db.commit()
+        db.refresh(current_user)
+        return current_user
 
     @strawberry.mutation
-    def update_favorite_canteens(
-        self,
-        userId: str,
-        canteenIds: List[int],
-    ) -> UserMutationResponse:
-        """Update user's favorite canteens"""
-        db = next(get_db())
-        user = db.query(User).filter(User.id == userId).first()
-        
-        if not user:
-            return UserMutationResponse(success=False, message="User not found")
-            
-        try:
-            user.favoriteCanteens = canteenIds
-            db.commit()
-            return UserMutationResponse(
-                success=True,
-                message="Favorite canteens updated successfully",
-                userId=str(user.id)
-            )
-        except Exception as e:
-            db.rollback()
-            return UserMutationResponse(
-                success=False,
-                message=f"Failed to update favorite canteens: {str(e)}"
-            )
+    def update_favorite_canteens(self, info: Info, canteen_ids: List[int]) -> UserType:
+        """Updates the favorite canteens list for the currently authenticated user."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("Authentication required.")
+
+        current_user.favoriteCanteens = canteen_ids
+        db.commit()
+        db.refresh(current_user)
+        return current_user
 
     @strawberry.mutation
-    def update_user(
-        self,
-        userId: str,
-        name: Optional[str] = None,
-        email: Optional[str] = None,
-        password: Optional[str] = None,
-        role: Optional[str] = None,
-        upi_id: Optional[str] = None,
-    ) -> UserMutationResponse:
-        """Update user profile"""
-        db = next(get_db())
-        user = db.query(User).filter(User.id == userId).first()
-        
-        if not user:
-            return UserMutationResponse(success=False, message="User not found")
+    def delete_own_account(self, info: Info) -> str:
+        """Deletes the account of the currently authenticated user."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("Authentication required.")
             
-        try:
-            if name:
-                user.name = name
-            if email and email != user.email:
-                # Check if email is already taken
-                if db.query(User).filter(User.email == email).first():
-                    return UserMutationResponse(
-                        success=False,
-                        message="Email is already taken"
-                    )
-                user.email = email
-                
-            if password:
-                user.password = password
-            if role:
-                user.role = role
-            if upi_id:
-                user.upi_id = upi_id
-                
-            db.commit()
-            return UserMutationResponse(
-                success=True,
-                message="Profile updated successfully",
-                userId=str(user.id)
-            )
-        except Exception as e:
-            db.rollback()
-            return UserMutationResponse(
-                success=False,
-                message=f"Failed to update profile: {str(e)}"
-            )
+        db.delete(current_user)
+        db.commit()
+        return "User account deleted successfully."
 
-    @strawberry.mutation
-    def delete_user(
-        self,
-        userId: str,
-    ) -> UserMutationResponse:
-        """Delete user"""
-        db = next(get_db())
-        user = db.query(User).filter(User.id == userId).first()
-        
-        if not user:
-            return UserMutationResponse(success=False, message="User not found")
-            
-        try:
-            db.delete(user)
-            db.commit()
-            return UserMutationResponse(
-                success=True,
-                message="User deleted successfully",
-                userId=str(user.id)
-            )
-        except Exception as e:
-            db.rollback()
-            return UserMutationResponse(
-                success=False,
-                message=f"Failed to delete user: {str(e)}"
-            )
-
-# Export the mutation fields
-mutations = [
-    strawberry.field(name="createUser", resolver=UserMutation.create_user),
-    strawberry.field(name="updateUserProfile", resolver=UserMutation.update_user_profile),
-    strawberry.field(name="updateFavoriteCanteens", resolver=UserMutation.update_favorite_canteens),
-    strawberry.field(name="updateUser", resolver=UserMutation.update_user),
-    strawberry.field(name="deleteUser", resolver=UserMutation.delete_user),
-]
+# Note: Admin-level mutations like deleting or updating *other* users
+# should be in a separate class with specific admin-only permissions.

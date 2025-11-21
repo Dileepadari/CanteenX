@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useNotification } from '@/contexts/NotificationContext';
 import { format } from 'date-fns';
+import { formatIST } from '@/lib/ist';
 
 interface NotificationBellProps {
   variant?: 'default' | 'outline' | 'ghost';
@@ -37,7 +38,7 @@ const NotificationBell = ({ variant = 'default' }: NotificationBellProps) => {
     if (diffHr < 24) return `${diffHr}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
     
-    return format(date, 'MMM d');
+  return formatIST(date, { month: 'short', day: '2-digit' });
   };
   
   return (
@@ -46,14 +47,14 @@ const NotificationBell = ({ variant = 'default' }: NotificationBellProps) => {
         <Button variant={variant} className="relative p-2 h-9 w-9">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center transform translate-x-1 -translate-y-1">
+            <span className="absolute top-0 right-0 w-4 h-4 bg-destructive text-white text-xs rounded-full flex items-center justify-center transform translate-x-1 -translate-y-1">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between bg-orange-50 p-3">
+        <div className="flex items-center justify-between bg-muted p-3">
           <h3 className="font-medium">Notifications</h3>
           {notifications.some(n => !n.read) && (
             <Button 
@@ -71,26 +72,26 @@ const NotificationBell = ({ variant = 'default' }: NotificationBellProps) => {
           {notifications.length > 0 ? (
             <div>
               {notifications.map((notification) => (
-                <div key={notification.id} className="p-3 hover:bg-gray-50 transition-colors">
+                <div key={notification.id} className="p-3 hover:bg-muted transition-colors">
                   <div 
-                    className={`flex items-start ${!notification.read ? 'bg-orange-50/50' : ''}`}
+                    className={`flex items-start ${!notification.read ? 'bg-muted/50' : ''}`}
                     role="button"
                     onClick={() => handleNotificationClick(notification.id, notification.action?.onClick)}
                   >
-                    <div className={`h-2 w-2 mt-1.5 rounded-full ${!notification.read ? 'bg-orange-500' : 'bg-gray-200'}`} />
+                    <div className={`h-2 w-2 mt-1.5 rounded-full ${!notification.read ? 'bg-destructive' : 'bg-muted'} `} />
                     <div className="ml-2 flex-1">
                       <div className="flex justify-between items-start">
                         <p className="font-medium text-sm">{notification.title}</p>
-                        <span className="text-xs text-gray-500">{getRelativeTime(notification.date)}</span>
+                        <span className="text-xs text-muted-foreground">{getRelativeTime(notification.date)}</span>
                       </div>
                       {notification.description && (
-                        <p className="text-xs text-gray-600 mt-1">{notification.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{notification.description}</p>
                       )}
                       {notification.action && (
                         <Button 
                           variant="link" 
                           size="sm" 
-                          className="h-6 p-0 mt-1 text-xs text-orange-600"
+                          className="h-6 p-0 mt-1 text-xs text-primary"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleNotificationClick(notification.id, notification.action?.onClick);

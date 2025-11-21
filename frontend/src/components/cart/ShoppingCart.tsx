@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart as CartIcon, Trash2, Plus, Minus, ChevronRight } from "lucide-react";
@@ -13,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -25,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useCart } from "@/contexts/CartContext";
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
 
 export const ShoppingCart = () => {
   const [open, setOpen] = useState(false);
@@ -47,23 +47,23 @@ export const ShoppingCart = () => {
     <>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative">
+          <div className="relative">
             <CartIcon className="h-5 w-5" />
             {totalItems > 0 && (
-              <Badge 
-                variant="default" 
+              <Badge
+                variant="default"
                 className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0"
               >
                 {totalItems > 9 ? "9+" : totalItems}
               </Badge>
             )}
-          </Button>
+          </div>
         </SheetTrigger>
         <SheetContent className="sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Your Cart</SheetTitle>
           </SheetHeader>
-          
+
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[70vh]">
               <div className="text-center mb-6">
@@ -109,57 +109,58 @@ export const ShoppingCart = () => {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-              
+
               <Separator />
-              
+
               <div className="mt-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-15rem)]">
                 {items.map((item) => (
                   <div key={item.id} className="flex items-start py-2">
                     <div className="h-16 w-16 rounded-md overflow-hidden flex-shrink-0">
-                      <img 
-                        src={item.image} 
-                        alt={item.name} 
+                      <img
+                        src={ensureImageSrc(item.image, item.id, 160, 160)}
+                        alt={item.name}
                         className="h-full w-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 160, 160); }}
                       />
                     </div>
-                    
+
                     <div className="ml-4 flex-1">
                       <h4 className="font-medium">{item.name}</h4>
                       <p className="text-sm text-muted-foreground mb-1">₹{item.price}</p>
-                      
+
                       {item.customizations && item.customizations.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           {item.customizations.join(", ")}
                         </p>
                       )}
-                      
+
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center">
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
+                          <Button
+                            variant="outline"
+                            size="icon"
                             className="h-7 w-7"
                             onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
                           <span className="w-8 text-center">{item.quantity}</span>
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
+                          <Button
+                            variant="outline"
+                            size="icon"
                             className="h-7 w-7"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        
+
                         <span className="font-medium">
                           ₹{(item.price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     </div>
-                    
+
                     <Button
                       variant="ghost"
                       size="icon"
@@ -171,7 +172,7 @@ export const ShoppingCart = () => {
                   </div>
                 ))}
               </div>
-              
+
               <div className="space-y-2 mt-auto pt-4">
                 <Separator />
                 <div className="flex justify-between py-1">
@@ -188,7 +189,7 @@ export const ShoppingCart = () => {
                   <span className="font-medium">₹{totalPrice.toFixed(2)}</span>
                 </div>
               </div>
-              
+
               <SheetFooter className="mt-4">
                 <Button className="w-full" onClick={handleCheckout}>
                   Checkout

@@ -1,11 +1,12 @@
 // src/pages/Checkout.tsx
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import MainLayout from '@/components/layout/MainLayout';
 import { useApolloClient, useMutation } from '@apollo/client';
+import { UPDATE_CART_ITEM, REMOVE_FROM_CART } from '@/gql/mutations/cart';
 import { GET_CART_ITEMS } from '@/gql/queries/cart';
 import { GET_CURRENT_USER } from '@/gql/queries/user';
 import { CREATE_ORDER } from '@/gql/mutations/orders';
@@ -21,7 +22,12 @@ const Checkout = () => {
   const client = useApolloClient();
   const { toast } = useToast();
   const [cartItems, setCartItems] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(PaymentMethods.UPI);
+  const location = useLocation();
+  const initialScheduled = location?.state?.scheduledPickup || null;
+  const initialPayment = location?.state?.selectedPaymentMethod || PaymentMethods.UPI;
+
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(initialPayment);
+  const [scheduledPickup, setScheduledPickup] = useState(initialScheduled);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [userId, setUserId] = useState("");
@@ -33,6 +39,10 @@ const Checkout = () => {
 
   // GraphQL mutation for creating orders
   const [createOrder, { loading: orderLoading }] = useMutation(CREATE_ORDER);
+  const [updateCartItem] = useMutation(UPDATE_CART_ITEM);
+  const [removeFromCart] = useMutation(REMOVE_FROM_CART);
+
+  const [stockIssues, setStockIssues] = useState<Array<{ cartItemId?: number; name?: string; available?: number; message: string }>>([]);
 
   // Fetch user data
   useEffect(() => {
@@ -70,10 +80,15 @@ const Checkout = () => {
         });
 
         if (data?.getCartByUserId) {
-          setCartItems(data.getCartByUserId.items || []);
-          console.log(data.getCartByUserId.items)
-          if (data.getCartByUserId.items[0].canteenId) {
-            setCanteenId(data.getCartByUserId?.items[0]?.canteenId);
+          const items = data.getCartByUserId.items || [];
+          setCartItems(items);
+          console.log(items);
+          // Guard against empty items array
+          if (items.length > 0 && items[0] && (items[0].canteenId || items[0].canteen_id)) {
+            // support both camelCase and snake_case keys depending on backend shape
+            setCanteenId(items[0].canteenId || items[0].canteen_id);
+          } else {
+            setCanteenId(null);
           }
         }
         setLoading(false);
@@ -148,23 +163,29 @@ const Checkout = () => {
       console.log("Sending order items:", JSON.stringify(orderItems));
 
       // Create order using GraphQL mutation
-      const { data } = await createOrder({
-        variables: {
-          userId,
-          canteenId,
-          items: orderItems,
-          paymentMethod: selectedPaymentMethod,
-          phone: contactInfo.phone,
-          customerNote: contactInfo.note,
-          isPreOrder: false
-        }
-      });
+      // Build the input expected by the backend CreateOrderInput
+      const pickupTimeValue = scheduledPickup ? `${scheduledPickup.date}T${scheduledPickup.time}` : null;
+
+      const input = {
+        userId,
+        canteenId,
+        items: orderItems,
+        totalAmount: total,
+        paymentMethod: selectedPaymentMethod,
+        phone: contactInfo.phone,
+        customerNote: contactInfo.note,
+        isPreOrder: false,
+        pickupTime: pickupTimeValue,
+      };
+
+      const { data } = await createOrder({ variables: { input } });
 
       setProcessing(false);
 
-      if (data?.createOrder?.success) {
-        const orderId = data.createOrder.orderId;
-        
+      // Backend returns an OrderType. Check for returned id to confirm success.
+        if (data?.createOrder?.id) {
+        const orderId = data.createOrder.id;
+
         if (selectedPaymentMethod === PaymentMethods.CASH) {
           toast({
             title: 'Order Placed Successfully',
@@ -172,18 +193,68 @@ const Checkout = () => {
           });
           navigate(`/orders/track/${orderId}`);
         } else {
-          // For UPI payments, redirect to payment page
-          navigate(`/payment/${orderId}`);
+          // For UPI payments, redirect to payment page.
+          // Pass the created order in navigation state to avoid a
+          // race where the payment page fetches before the order is
+          // visible due to timing or auth differences.
+          navigate(`/payment/${orderId}`, { state: { order: data.createOrder } });
         }
       } else {
-        throw new Error(data?.createOrder?.message || "Failed to create order");
+        // Unexpected response shape
+        throw new Error('Failed to create order. Invalid server response.');
       }
-    } catch (error) {
+    } catch (error: any) {
       setProcessing(false);
-      console.error("Error creating order:", error);
+      console.error('Error creating order:', error);
+
+      // Reset previous stock issues
+      setStockIssues([]);
+
+      // Apollo GraphQL errors may appear in graphQLErrors
+      const gqlErrors = error?.graphQLErrors || [];
+      let handled = false;
+
+      for (const ge of gqlErrors) {
+        const msg = ge?.message || '';
+
+        // Parse messages like: Insufficient stock for item 'NAME'. Available: X, requested: Y
+        const m = msg.match(/Insufficient stock for item '(.*?)'\. Available: (\d+), requested: (\d+)/i);
+        if (m) {
+          const [, name, availableStr] = m;
+          const available = parseInt(availableStr, 10);
+
+          // Try to map to a cart item by name
+          const cartMatch = cartItems.find((c) => (c.name || '').trim() === name.trim());
+          const cartItemId = cartMatch ? cartMatch.id : undefined;
+
+          setStockIssues((s) => [...s, { cartItemId, name, available, message: msg }]);
+          handled = true;
+        }
+      }
+
+      if (handled) {
+        toast({
+          title: 'Stock Problem',
+          description: 'Some items in your cart have insufficient stock. Please adjust quantities or remove items.',
+          variant: 'destructive',
+        });
+        // refresh cart from server to get canonical state
+        try {
+          const { data: refreshed } = await client.query({ query: GET_CART_ITEMS, variables: { userId }, fetchPolicy: 'network-only' });
+          if (refreshed?.getCartByUserId) {
+            setCartItems(refreshed.getCartByUserId.items || []);
+          }
+        } catch (e) {
+          console.warn('Failed to refresh cart after stock error', e);
+        }
+        return;
+      }
+
+      // Fallback: use server message or generic
+      const fallbackMsg = error?.message || (error?.graphQLErrors && error.graphQLErrors[0]?.message) || 'There was a problem placing your order. Please try again.';
       toast({
         title: 'Order Creation Failed',
-        description: error.message || 'There was a problem placing your order. Please try again.',
+        description: fallbackMsg,
         variant: 'destructive',
       });
     }
@@ -194,7 +265,7 @@ const Checkout = () => {
       <MainLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2">Loading checkout...</span>
           </div>
         </div>
@@ -222,6 +293,102 @@ const Checkout = () => {
     <MainLayout>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">Checkout</h1>
+
+        {/* Show selected pickup & payment summary (if provided from Cart) */}
+        {(scheduledPickup || selectedPaymentMethod) && (
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {scheduledPickup && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pickup Time</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm">
+                    <div className="font-medium">Date</div>
+                    <div className="text-muted-foreground">{scheduledPickup?.date}</div>
+                    <div className="font-medium mt-2">Time</div>
+                    <div className="text-muted-foreground">{scheduledPickup?.time}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm">
+                  <div className="font-medium">Selected Method</div>
+                  <div className="text-muted-foreground">{selectedPaymentMethod === PaymentMethods.CASH ? 'Cash on Pickup' : 'UPI / Online'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Show stock issues if any */}
+        {stockIssues.length > 0 && (
+          <div className="mb-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stock issues found</CardTitle>
+                <CardDescription>Please fix the following items before placing the order.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {stockIssues.map((si, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{si.name || 'Unknown item'}</p>
+                        <p className="text-sm text-muted-foreground">{si.message}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {si.cartItemId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                await removeFromCart({ variables: { cartItemId: si.cartItemId } });
+                                const { data: refreshed } = await client.query({ query: GET_CART_ITEMS, variables: { userId }, fetchPolicy: 'network-only' });
+                                if (refreshed?.getCartByUserId) setCartItems(refreshed.getCartByUserId.items || []);
+                                setStockIssues((s) => s.filter((x) => x.cartItemId !== si.cartItemId));
+                              } catch (e) {
+                                console.error('Failed to remove cart item', e);
+                                toast({ title: 'Error', description: 'Failed to remove item from cart', variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                        {si.cartItemId && si.available !== undefined && (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await updateCartItem({ variables: { cartItemId: si.cartItemId, quantity: si.available } });
+                                const { data: refreshed } = await client.query({ query: GET_CART_ITEMS, variables: { userId }, fetchPolicy: 'network-only' });
+                                if (refreshed?.getCartByUserId) setCartItems(refreshed.getCartByUserId.items || []);
+                                setStockIssues((s) => s.filter((x) => x.cartItemId !== si.cartItemId));
+                              } catch (e) {
+                                console.error('Failed to update cart item', e);
+                                toast({ title: 'Error', description: 'Failed to update item quantity', variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            Set to available ({si.available})
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Left column - Order details */}
@@ -311,46 +478,43 @@ const Checkout = () => {
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total</span>
-                    <span className="text-orange-600">₹{total.toFixed(2)}</span>
+                    <span className="text-primary">₹{total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <p className="font-medium">Payment Method</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <div
-                      className={`border rounded-md p-3 cursor-pointer ${
-                        selectedPaymentMethod === PaymentMethods.UPI
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200'
-                      }`}
+                    <button
+                      type="button"
+                      aria-pressed={selectedPaymentMethod === PaymentMethods.UPI}
+                      className={`w-full text-left border rounded-md p-3 focus:outline-none transition-colors ${selectedPaymentMethod === PaymentMethods.UPI ? 'bg-primary text-white border-primary shadow' : 'bg-white border-gray-200'}`}
                       onClick={() => handlePaymentMethodChange(PaymentMethods.UPI)}
                     >
                       <div className="flex flex-col items-center">
-                        <CreditCard className="h-6 w-6 text-orange-500 mb-1" />
-                        <span>UPI / Online</span>
+                        <CreditCard className={`h-6 w-6 mb-1 ${selectedPaymentMethod === PaymentMethods.UPI ? 'text-white' : 'text-primary'}`} />
+                        <span className={`${selectedPaymentMethod === PaymentMethods.UPI ? 'text-white' : ''}`}>UPI / Online</span>
                       </div>
-                    </div>
-                    <div
-                      className={`border rounded-md p-3 cursor-pointer ${
-                        selectedPaymentMethod === PaymentMethods.CASH
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200'
-                      }`}
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-pressed={selectedPaymentMethod === PaymentMethods.CASH}
+                      className={`w-full text-left border rounded-md p-3 focus:outline-none transition-colors ${selectedPaymentMethod === PaymentMethods.CASH ? 'bg-primary text-white border-primary shadow' : 'bg-white border-gray-200'}`}
                       onClick={() => handlePaymentMethodChange(PaymentMethods.CASH)}
                     >
                       <div className="flex flex-col items-center">
-                        <Banknote className="h-6 w-6 text-orange-500 mb-1" />
-                        <span>Cash on Pickup</span>
+                        <Banknote className={`h-6 w-6 mb-1 ${selectedPaymentMethod === PaymentMethods.CASH ? 'text-white' : 'text-primary'}`} />
+                        <span className={`${selectedPaymentMethod === PaymentMethods.CASH ? 'text-white' : ''}`}>Cash on Pickup</span>
                       </div>
-                    </div>
+                    </button>
                   </div>
                 </div>
               </CardContent>
               <CardFooter>
                 <Button
-                  className="w-full bg-orange-500 hover:bg-orange-600"
-                  disabled={processing}
+                  className="w-full bg-primary hover:bg-primary/90"
+                  disabled={processing || stockIssues.length > 0}
                   onClick={handlePlaceOrder}
                 >
                   {processing ? (
@@ -361,6 +525,9 @@ const Checkout = () => {
                     `Place Order • ₹${total.toFixed(2)}`
                   )}
                 </Button>
+                {stockIssues.length > 0 && (
+                  <p className="mt-2 text-sm text-destructive">Please resolve the stock issues above before placing your order.</p>
+                )}
               </CardFooter>
             </Card>
           </div>

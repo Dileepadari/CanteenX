@@ -1,213 +1,135 @@
+    
 import strawberry
-from typing import Optional, List
-import json
-from app.models.menu_item import MenuItem
+from typing import Optional, Dict, Any
+from strawberry.types import Info
+from sqlalchemy.orm import Session
+
+from app.models.menu_item import MenuItem, MenuItemType, CustomizationOptionsInput, CreateMenuItemInput, UpdateMenuItemInput
 from app.models.canteen import Canteen
-from app.core.database import get_db
+from app.models.user import User
+
+def _get_item_and_verify_owner(db: Session, item_id: int, user: User):
+    """
+    Fetches a menu item and verifies the user is its canteen's owner.
+    Raises GraphQLError if not found or if unauthorized.
+    """
+    item = db.query(MenuItem).filter(MenuItem.id == item_id).first()
+    if not item:
+        raise strawberry.GraphQLError("Menu item not found.")
+        
+    canteen = db.query(Canteen).filter(Canteen.id == item.canteenId).first()
+    if not canteen or canteen.userId != user.id:
+        raise strawberry.GraphQLError("Unauthorized: You do not have permission to modify this menu item.")
+        
+    return item
+
+def _convert_customizations_to_dict(customizations: Optional[CustomizationOptionsInput]) -> Optional[Dict[str, Any]]:
+    """Converts the CustomizationOptionsInput to a dictionary for database storage."""
+    if not customizations:
+        return None
+    return {
+        "sizes": [{"name": size.name, "price": size.price} for size in customizations.sizes or []],
+        "additions": [{"name": addition.name, "price": addition.price} for addition in customizations.additions or []],
+        "removals": customizations.removals or []
+    }
 
 @strawberry.type
-class MenuItemMutationResponse:
-    success: bool
-    message: str
-    itemId: Optional[int] = None
-
-@strawberry.input
-class SizeOptionInput:
-    name: str
-    price: float
-
-@strawberry.input
-class AdditionOptionInput:
-    name: str
-    price: float
-
-@strawberry.input
-class CustomizationOptionsInput:
-    sizes: Optional[List[SizeOptionInput]] = None
-    additions: Optional[List[AdditionOptionInput]] = None
-    removals: Optional[List[str]] = None
-
-@strawberry.type
-class MenuMutation:
+class MenuMutations:
     @strawberry.mutation
-    def create_menu_item(
-        self,
-        name: str,
-        price: float,
-        canteenId: int,
-        canteenName: str,
-        currentUserId: str,
-        description: Optional[str] = None,
-        image: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        isPopular: bool = False,
-        preparationTime: int = 15,
-        customizationOptions: Optional[CustomizationOptionsInput] = None,
-    ) -> MenuItemMutationResponse:
-        """Create a new menu item"""
-        db = next(get_db())
-        
-        # Verify canteen exists
-        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
+    def create_menu_item(self, info: Info, input: CreateMenuItemInput) -> MenuItemType:
+        """Creates a new menu item for a canteen owned by the current user."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise strawberry.GraphQLError("You must be logged in to create a menu item.")
+
+        canteen = db.query(Canteen).filter(Canteen.id == input.canteen_id).first()
         if not canteen:
-            return MenuItemMutationResponse(
-                success=False, 
-                message="Canteen not found"
-            )
+            raise strawberry.GraphQLError("Canteen not found.")
+        if canteen.userId != current_user.id:
+            raise strawberry.GraphQLError("Unauthorized: You can only add items to your own canteen.")
+
+        customization_dict = _convert_customizations_to_dict(input.customization_options)
         
-        # # Check if current user is the owner of this canteen
-        # if canteen.userId != currentUserId:
-        #     return MenuItemMutationResponse(
-        #         success=False,
-        #         message="Unauthorized: You don't have permission to add items to this canteen"
-        #     )
+        new_item = MenuItem(
+            name=input.name,
+            price=input.price,
+            canteenId=canteen.id,
+            canteenName=canteen.name, # Sourced directly from the canteen model
+            description=input.description,
+            image=input.image,
+            category=input.category,
+            tags=input.tags,
+            isPopular=input.is_popular,
+            preparationTime=input.preparation_time,
+            customizationOptions=customization_dict,
+            isAvailable=True,
+            rating=0.0,
+            ratingCount=0
+        )
         
-        try:
-            # Convert CustomizationOptionsInput to dictionary for database storage
-            customization_dict = None
-            if customizationOptions:
-                customization_dict = {
-                    "sizes": [{"name": size.name, "price": size.price} for size in customizationOptions.sizes] if customizationOptions.sizes else None,
-                    "additions": [{"name": addition.name, "price": addition.price} for addition in customizationOptions.additions] if customizationOptions.additions else None,
-                    "removals": customizationOptions.removals
-                }
-            
-            new_item = MenuItem(
-                name=name,
-                price=price,
-                canteenId=canteenId,
-                canteenName=canteenName,
-                description=description,
-                image=image,
-                category=category,
-                tags=tags,
-                isPopular=isPopular,
-                preparationTime=preparationTime,
-                customizationOptions=customization_dict,
-                isAvailable=True,
-                rating=0.0,
-                ratingCount=0
-            )
-            db.add(new_item)
-            db.commit()
-            return MenuItemMutationResponse(
-                success=True, 
-                message=f"Menu item '{name}' created successfully",
-                itemId=new_item.id
-            )
-        except Exception as e:
-            db.rollback()
-            return MenuItemMutationResponse(
-                success=False, 
-                message=f"Failed to create menu item: {str(e)}"
-            )
+        db.add(new_item)
+        db.commit()
+        db.refresh(new_item)
+        return new_item
 
     @strawberry.mutation
-    def update_menu_item(
-        self,
-        itemId: int,
-        currentUserId: str,
-        name: Optional[str] = None,
-        price: Optional[float] = None,
-        description: Optional[str] = None,
-        image: Optional[str] = None,
-        category: Optional[str] = None,
-        isAvailable: Optional[bool] = None,
-        isPopular: Optional[bool] = None,
-        preparationTime: Optional[int] = None,
-        customizationOptions: Optional[CustomizationOptionsInput] = None,
-    ) -> MenuItemMutationResponse:
-        """Update a menu item"""
-        db = next(get_db())
+    def update_menu_item(self, info: Info, item_id: int, input: UpdateMenuItemInput) -> MenuItemType:
+        """Updates a menu item. Must be the owner of the canteen."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise strawberry.GraphQLError("You must be logged in to update a menu item.")
+
+        item = _get_item_and_verify_owner(db, item_id, current_user)
         
-        # Find and verify item
-        item = db.query(MenuItem).filter(MenuItem.id == itemId).first()
-        if not item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
-            
-        canteen = db.query(Canteen).filter(Canteen.id == item.canteenId).first()
-        if not canteen:
-            return MenuItemMutationResponse(
-                success=False, 
-                message="Canteen not found"
-            )
-            
-        # Check if current user is the owner of this canteen
-        # if canteen.userId != currentUserId:
-        #     return MenuItemMutationResponse(
-        #         success=False,
-        #         message="Unauthorized: You don't have permission to update items in this canteen"
-        #     )
+        update_data = {k: v for k, v in input.__dict__.items() if v is not strawberry.UNSET}
+        if not update_data:
+            raise strawberry.GraphQLError("No update data provided.")
+
+        for key, value in update_data.items():
+            if key == "customization_options":
+                item.customizationOptions = _convert_customizations_to_dict(value)
+            else:
+                # Map snake_case from input to camelCase on model
+                model_key = key.replace('_', '')
+                model_key = model_key[0].lower() + ''.join(word.capitalize() for word in model_key[1:].split('_'))
+                setattr(item, model_key, value)
         
-        try:
-            # Update only provided fields
-            if name is not None: item.name = name
-            if price is not None: item.price = price
-            if description is not None: item.description = description
-            if image is not None: item.image = image
-            if category is not None: item.category = category
-            if isAvailable is not None: item.isAvailable = isAvailable
-            if isPopular is not None: item.isPopular = isPopular
-            if preparationTime is not None: item.preparationTime = preparationTime
-            
-            # Convert CustomizationOptionsInput to dictionary for database storage
-            if customizationOptions is not None:
-                customization_dict = {
-                    "sizes": [{"name": size.name, "price": size.price} for size in customizationOptions.sizes] if customizationOptions.sizes else None,
-                    "additions": [{"name": addition.name, "price": addition.price} for addition in customizationOptions.additions] if customizationOptions.additions else None,
-                    "removals": customizationOptions.removals
-                }
-                item.customizationOptions = customization_dict
-            
-            db.commit()
-            return MenuItemMutationResponse(
-                success=True,
-                message="Menu item updated successfully",
-                itemId=item.id
-            )
-        except Exception as e:
-            db.rollback()
-            return MenuItemMutationResponse(success=False, message=f"Failed to update menu item: {str(e)}")
+        db.commit()
+        db.refresh(item)
+        return item
 
     @strawberry.mutation
-    def delete_menu_item(
-        self,
-        itemId: int,
-        currentUserId: str
-    ) -> MenuItemMutationResponse:
-        """Delete a menu item"""
-        db = next(get_db())
-        
-        item = db.query(MenuItem).filter(MenuItem.id == itemId).first()
-        if not item:
-            return MenuItemMutationResponse(success=False, message="Menu item not found")
+    def delete_menu_item(self, info: Info, item_id: int) -> str:
+        """Deletes a menu item. Must be the owner of the canteen."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise strawberry.GraphQLError("You must be logged in to delete a menu item.")
             
-        canteen = db.query(Canteen).filter(Canteen.id == item.canteenId).first()
-        if not canteen:
-            return MenuItemMutationResponse(
-                success=False, 
-                message="Canteen not found"
-            )
-            
-        # Check if current user is the owner of this canteen
-        if canteen.userId != currentUserId:
-            return MenuItemMutationResponse(
-                success=False,
-                message="Unauthorized: You don't have permission to delete items from this canteen"
-            )
+        item = _get_item_and_verify_owner(db, item_id, current_user)
         
+        db.delete(item)
+        db.commit()
+        return "Menu item deleted successfully."
+
+    @strawberry.mutation
+    def set_menu_item_stock(self, info: Info, item_id: int, stock_count: int) -> MenuItemType:
+        """Set the stock count for a menu item. Only the canteen owner may update stock."""
+        db: Session = info.context["db"]
+        current_user = info.context.get("user")
+        if not current_user:
+            raise strawberry.GraphQLError("You must be logged in to update stock.")
+
+        item = _get_item_and_verify_owner(db, item_id, current_user)
         try:
-            db.delete(item)
+            item.stock_count = int(stock_count)
             db.commit()
-            return MenuItemMutationResponse(success=True, message=f"Menu item deleted successfully")
+            db.refresh(item)
+            return item
         except Exception as e:
             db.rollback()
-            return MenuItemMutationResponse(success=False, message=f"Failed to delete menu item: {str(e)}")
+            raise strawberry.GraphQLError(f"Failed to update stock: {e}")
 
-# Export the mutation fields
-mutations = [
-    strawberry.field(name="createMenuItem", resolver=MenuMutation.create_menu_item),
-    strawberry.field(name="updateMenuItem", resolver=MenuMutation.update_menu_item),
-    strawberry.field(name="deleteMenuItem", resolver=MenuMutation.delete_menu_item),
-]
+  

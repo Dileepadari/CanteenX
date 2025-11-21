@@ -5,29 +5,19 @@
 import { gql } from "@apollo/client";
 
 export const CREATE_ORDER = gql`
-  mutation CreateOrder(
-    $userId: String!,
-    $canteenId: Int!,
-    $items: [OrderItemInput!]!,
-    $paymentMethod: String!,
-    $phone: String!,
-    $customerNote: String,
-    $isPreOrder: Boolean,
-    $pickupTime: String
-  ) {
-    createOrder(
-      userId: $userId,
-      canteenId: $canteenId,
-      items: $items,
-      paymentMethod: $paymentMethod,
-      phone: $phone,
-      customerNote: $customerNote,
-      isPreOrder: $isPreOrder,
-      pickupTime: $pickupTime
-    ) {
-      success
-      message
-      orderId
+  mutation CreateOrder($input: CreateOrderInput!) {
+    createOrder(input: $input) {
+      id
+      userId
+      canteenId
+      totalAmount
+      status
+      orderTime
+      paymentMethod
+      paymentStatus
+      phone
+      pickupTime
+      isPreOrder
     }
   }
 `;
@@ -58,31 +48,19 @@ export const UPDATE_ORDER_STATUS = gql`
  * Create a scheduled order for future pickup
  */
 export const PLACE_SCHEDULED_ORDER = gql`
-  mutation PlaceScheduledOrder(
-    $userId: String!,
-    $canteenId: Int!,
-    $items: [OrderItemInput!]!,
-    $subtotal: Float!,
-    $totalAmount: Float!,
-    $paymentMethod: String,
-    $pickupTime: String,
-    $customerNote: String,
-    $phone: String
-  ) {
-    placeScheduledOrder(
-      userId: $userId,
-      canteenId: $canteenId,
-      items: $items,
-      subtotal: $subtotal,
-      totalAmount: $totalAmount,
-      paymentMethod: $paymentMethod,
-      pickupTime: $pickupTime,
-      customerNote: $customerNote,
-      phone: $phone
-    ) {
-      success
-      message
-      orderId
+  mutation PlaceScheduledOrder($input: CreateOrderInput!) {
+    placeScheduledOrder(input: $input) {
+      id
+      userId
+      canteenId
+      totalAmount
+      status
+      orderTime
+      paymentMethod
+      paymentStatus
+      phone
+      pickupTime
+      isPreOrder
     }
   }
 `;
@@ -171,6 +149,16 @@ export const UPDATE_ORDER_PREPARATION_TIME = gql`
     ) {
       success
       message
+    }
+  }
+`;
+
+export const MARK_ORDER_PAID = gql`
+  mutation MarkOrderPaid($orderId: Int!, $paymentReference: String) {
+    markOrderPaid(orderId: $orderId, paymentReference: $paymentReference) {
+      id
+      status
+      paymentStatus
     }
   }
 `;

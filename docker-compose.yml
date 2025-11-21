@@ -24,7 +24,7 @@ services:
         echo 'Waiting for database connection...';
       done &&
       echo 'Database is ready!' &&
-      python -m app.mock_data &&
+      python -m app.helpers.mock_data &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
     volumes:

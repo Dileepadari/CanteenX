@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, Clock, Percent, Tag } from 'lucide-react';
+import { toISTDateISO } from '@/lib/ist';
 
 interface PromotionFormProps {
   open: boolean;
@@ -51,8 +52,8 @@ const PromotionForm = ({ open, onOpenChange, promotion, onSave }: PromotionFormP
     discount: promotion?.discount || 10,
     startTime: promotion?.startTime || '08:00',
     endTime: promotion?.endTime || '20:00',
-    startDate: promotion?.startDate || new Date().toISOString().split('T')[0],
-    endDate: promotion?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  startDate: promotion?.startDate || toISTDateISO(new Date()) || '',
+  endDate: promotion?.endDate || toISTDateISO(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) || '',
     active: promotion?.active !== undefined ? promotion.active : true,
   });
 

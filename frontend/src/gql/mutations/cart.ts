@@ -33,13 +33,11 @@ mutation AddToCart($input: AddToCartInput!) {
  * Mutation to update a cart item's details (quantity, size, extras, etc.)
  */
 export const UPDATE_CART_ITEM = gql`
-mutation UpdateCartItem(
-  $userId: String!,
+mutation UpdateCartItemQuantity(
   $cartItemId: Int!,
-  $quantity: Int
+  $quantity: Int!
 ) {
-  updateCartItem(
-    userId: $userId,
+  updateCartItemQuantity(
     cartItemId: $cartItemId,
     quantity: $quantity
   ) {
@@ -54,11 +52,9 @@ mutation UpdateCartItem(
  */
 export const REMOVE_FROM_CART = gql`
 mutation RemoveFromCart(
-  $userId: String!,
   $cartItemId: Int!
 ) {
   removeFromCart(
-    userId: $userId,
     cartItemId: $cartItemId
   ) {
     success
@@ -71,10 +67,8 @@ mutation RemoveFromCart(
  * Mutation to clear the user's entire cart
  */
 export const CLEAR_CART = gql`
-mutation ClearCart($userId: String!) {
-  clearCart(
-    userId: $userId
-  ) {
+mutation ClearCart {
+  clearCart {
     success
     message
   }

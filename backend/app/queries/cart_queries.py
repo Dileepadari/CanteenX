@@ -1,125 +1,110 @@
 import strawberry
 import json
-from typing import List, Optional
-from app.models.cart import Cart, CartItem
-from app.core.database import get_db
-from datetime import datetime
+from typing import Optional
+from strawberry.types import Info
+from sqlalchemy.orm import Session, selectinload
+from app.models.cart import Cart, CartItem, CartType, CartItemType, CustomizationsType
 
-@strawberry.type
-class CustomizationsType:
-    size: Optional[str]
-    additions: Optional[List[str]]
-    removals: Optional[List[str]]
-    notes: Optional[str]
-
-@strawberry.type
-class CartItemType:
-    id: int
-    cartId: int
-    menuItemId: int
-    name: Optional[str]
-    price: Optional[float]
-    quantity: int
-    canteenId: Optional[int]
-    canteenName: Optional[str]
-    customizations: Optional[CustomizationsType]
-    specialInstructions: Optional[str]
-    location: Optional[str]
-
-@strawberry.type
-class CartType:
-    id: int
-    userId: str
-    createdAt: str
-    updatedAt: str
-    pickupDate: Optional[str]
-    pickupTime: Optional[str]
-    items: Optional[List[CartItemType]] = None
-
-def resolve_get_cart_by_user_id(userId: str) -> Optional[CartType]:
-    db = next(get_db())
-    cart = db.query(Cart).filter(Cart.userId == userId).first()
-    if not cart:
-        return None
-    cart_items = db.query(CartItem).filter(CartItem.cartId == cart.id).all()
-    cart_items_types = []
-    for item in cart_items:
-        customizations = None
-        
-        # Handle the customizations properly
-        if item.customizations:
-            custom_data = item.customizations
-            # If customizations is stored as a string, parse it to a dictionary
-            if isinstance(custom_data, str):
-                try:
-                    custom_data = json.loads(custom_data)
-                except Exception:
-                    custom_data = {}
-                
-            if isinstance(custom_data, dict):
-                customizations = CustomizationsType(
-                    size=custom_data.get("size"),
-                    additions=custom_data.get("additions"),
-                    removals=custom_data.get("removals"),
-                    notes=custom_data.get("notes") or item.specialInstructions,
-                )
+def _parse_customizations(item: CartItem) -> Optional[CustomizationsType]:
+    """
+    Parses customizations from various possible data formats on a CartItem.
+    Handles modern JSON format, legacy fields, and string-encoded JSON.
+    """
+    def _coerce_list_to_strings(values):
+        if values is None:
+            return None
+        out = []
+        for v in values:
+            if isinstance(v, dict):
+                # prefer common keys
+                out.append(v.get('name') or v.get('label') or str(v))
             else:
-                # Fallback for legacy or incorrectly formatted data
-                customizations = CustomizationsType(
-                    size=None,
-                    additions=None,
-                    removals=None,
-                    notes=item.specialInstructions,
-                )
-        elif item.selectedSize or item.selectedExtras or item.specialInstructions:
-            # Handle legacy data format
-            selected_size = item.selectedSize
-            if selected_size is not None and isinstance(selected_size, str):
-                try:
-                    selected_size = json.loads(selected_size)
-                except Exception:
-                    selected_size = item.selectedSize
-                    
-            selected_extras = item.selectedExtras
-            if selected_extras is not None:
-                try:
-                    if isinstance(selected_extras, str):
-                        selected_extras = json.loads(selected_extras)
-                except Exception:
-                    selected_extras = {}
-                    
-            customizations = CustomizationsType(
-                size=selected_size if not isinstance(selected_size, dict) else None,
-                additions=selected_extras.get("additions") if isinstance(selected_extras, dict) else None,
-                removals=selected_extras.get("removals") if isinstance(selected_extras, dict) else None,
-                notes=item.specialInstructions,
+                out.append(str(v))
+        return out if out else None
+
+    # Modern format: `customizations` is a dictionary
+    if getattr(item, "customizations", None) and isinstance(item.customizations, dict):
+        custom_data = item.customizations
+        return CustomizationsType(
+            size=custom_data.get("size"),
+            additions=_coerce_list_to_strings(custom_data.get("additions")),
+            removals=_coerce_list_to_strings(custom_data.get("removals")),
+            notes=(custom_data.get("notes") if not isinstance(custom_data.get("notes"), dict) else json.dumps(custom_data.get("notes"))),
+        )
+
+    # Handle `customizations` stored as a JSON string
+    if getattr(item, "customizations", None) and isinstance(item.customizations, str):
+        try:
+            custom_data = json.loads(item.customizations)
+            return CustomizationsType(
+                size=custom_data.get("size"),
+                additions=custom_data.get("additions"),
+                removals=custom_data.get("removals"),
+                notes=custom_data.get("notes"),
             )
-            
-        cart_items_types.append(CartItemType(
-            id=item.id,
-            cartId=item.cartId,
-            menuItemId=item.menuItemId,
-            name=getattr(item, "name", None),
-            price=getattr(item, "price", None),
-            quantity=item.quantity,
-            canteenId=getattr(item, "canteenId", None),
-            canteenName=getattr(item, "canteenName", None),
-            customizations=customizations,
-            specialInstructions=item.specialInstructions,
-            location=item.location
-        ))
-    return CartType(
-        id=cart.id,
-        userId=cart.userId,
-        createdAt=cart.createdAt,
-        updatedAt=cart.updatedAt,
-        pickupDate=cart.pickupDate.isoformat() if cart.pickupDate else None,
-        pickupTime=cart.pickupTime if cart.pickupTime else None,
-        items=cart_items_types
+        except json.JSONDecodeError:
+            # If parsing fails, fall back to legacy fields or nothing
+            pass
+
+    # Fallback: if the cart item has no customizations, try the linked menu_item's
+    # customization options (this covers cases where the frontend sent item-level
+    # customizations or the DB stores options on the menu item itself).
+    menu_item = getattr(item, "menu_item", None)
+    if menu_item is not None:
+        opts = getattr(menu_item, "customizationOptions", None)
+        if isinstance(opts, dict):
+            return CustomizationsType(
+                size=opts.get("size"),
+                additions=_coerce_list_to_strings(opts.get("additions")),
+                removals=_coerce_list_to_strings(opts.get("removals")),
+                notes=(opts.get("notes") if not isinstance(opts.get("notes"), dict) else json.dumps(opts.get("notes"))),
+            )
+
+    return None
+
+def _convert_cart_item_to_type(item: CartItem) -> CartItemType:
+    """Converts a CartItem SQLAlchemy model to a CartItemType."""
+    return CartItemType(
+        id=item.id,
+        menuItemId=item.menu_item_id,
+        quantity=item.quantity,
+        name=getattr(getattr(item, "menu_item", None), "name", None),
+        price=getattr(getattr(item, "menu_item", None), "price", None),
+        canteenId=getattr(getattr(item, "menu_item", None), "canteenId", None),
+        canteenName=getattr(getattr(item, "menu_item", None), "canteenName", None),
+        cartId=getattr(item, "cart_id", None),
+        specialInstructions=( _parse_customizations(item).notes if _parse_customizations(item) and getattr(_parse_customizations(item), 'notes', None) else None ),
+        location=getattr(getattr(getattr(item, "menu_item", None), "canteen", None), "location", None),
+        customizations=_parse_customizations(item),
     )
 
-getCartByUserId = strawberry.field(name="getCartByUserId", resolver=resolve_get_cart_by_user_id)
+@strawberry.type
+class CartQueries:
+    @strawberry.field
+    def get_cart_by_user_id(self, userId: str, info: Info) -> Optional[CartType]:
+        """Get the cart for a specific user, including all items."""
+        db: Session = info.context["db"]
+        
+        # Use selectinload to efficiently fetch the cart and its items in one go
+        cart = (
+            db.query(Cart)
+            .options(selectinload(Cart.items))
+            .filter(Cart.user_id == userId)
+            .first()
+        )
+        
+        if not cart:
+            return None
 
-queries = [
-    getCartByUserId
-]
+        # Convert cart items using the helper function
+        cart_items_types = [_convert_cart_item_to_type(item) for item in cart.items]
+
+        return CartType(
+            id=cart.id,
+            userId=cart.user_id,
+            createdAt=cart.created_at.isoformat() if cart.created_at else None,
+            updatedAt=cart.updated_at.isoformat() if cart.updated_at else None,
+            pickupDate=cart.pickup_date.isoformat() if cart.pickup_date else None,
+            pickupTime=cart.pickup_time if cart.pickup_time else None,
+            items=cart_items_types
+        )

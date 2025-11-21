@@ -14,7 +14,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNotification } from "@/contexts/NotificationContext";
-import { canteens } from "@/data/mockData";
+import { useQuery } from '@apollo/client';
+import { GET_CANTEENS } from '@/gql/queries/canteens';
 import {
   User,
   Building,
@@ -39,6 +40,8 @@ import {
 const VendorSettings = () => {
   const [selectedCanteen, setSelectedCanteen] = useState<number>(1);
   const { addNotification } = useNotification();
+  const { data: canteenData } = useQuery(GET_CANTEENS, { fetchPolicy: 'cache-first' });
+  const canteens = canteenData?.getAllCanteens || [];
   
   // Form states
   const [profileForm, setProfileForm] = useState({
@@ -125,7 +128,7 @@ const VendorSettings = () => {
                 <SelectValue placeholder="Select Canteen" />
               </SelectTrigger>
               <SelectContent>
-                {canteens.map((canteen) => (
+                {canteens.map((canteen: any) => (
                   <SelectItem key={canteen.id} value={canteen.id.toString()}>
                     {canteen.name}
                   </SelectItem>

@@ -85,3 +85,12 @@ export const ESCALATE_COMPLAINT = gql`
     }
   }
 `;
+
+export const ESCALATE_STALE_COMPLAINTS = gql`
+  mutation EscalateStaleComplaints($days: Int!) {
+    escalateStaleComplaints(days: $days) {
+      success
+      message
+    }
+  }
+`;

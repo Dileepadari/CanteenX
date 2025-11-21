@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItemDialog } from "./MenuItemDialog";
 import { useCart } from "@/contexts/CartContext";
-import { canteens } from "@/data/mockData";
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
+import { useQuery } from "@apollo/client";
+import { GET_CANTEEN_BY_ID } from "@/gql/queries/canteens";
 
 interface MenuItem {
   id: number;
@@ -46,7 +48,11 @@ const MenuItemCardWithDialog = ({ item }: MenuItemCardProps) => {
   const [showDetails, setShowDetails] = useState(false);
   const { addItem } = useCart();
   
-  const canteen = canteens.find(c => c.id === item.canteenId);
+  const { data: canteenData } = useQuery(GET_CANTEEN_BY_ID, {
+    variables: { id: item.canteenId },
+    skip: item.canteenId == null,
+  });
+  const canteen = canteenData?.getCanteenById;
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,7 +84,12 @@ const MenuItemCardWithDialog = ({ item }: MenuItemCardProps) => {
         onClick={() => setShowDetails(true)}
       >
         <div className="relative h-40">
-          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+          <img
+            src={ensureImageSrc(item.image, item.id, 640, 400)}
+            alt={item.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 640, 400); }}
+          />
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {item.isVegetarian && (
               <Badge variant="success" className="text-xs">Veg</Badge>
@@ -112,7 +123,7 @@ const MenuItemCardWithDialog = ({ item }: MenuItemCardProps) => {
               disabled={!item.isAvailable}
               onClick={handleQuickAdd}
             >
-              <PlusCircle className={`h-5 w-5 ${!item.isAvailable ? 'text-gray-300' : 'text-canteen-orange'}`} />
+              <PlusCircle className={`h-5 w-5 ${!item.isAvailable ? 'text-gray-300' : 'text-primary'}`} />
             </Button>
           </div>
           

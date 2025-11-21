@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Minus, Clock } from "lucide-react";
 import { useCart, CartItem } from "@/contexts/CartContext";
-import { canteens } from "@/data/mockData";
+import { useQuery } from "@apollo/client";
+import { GET_CANTEEN_BY_ID } from "@/gql/queries/canteens";
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
 
 interface MenuItemDialogProps {
   item: {
@@ -59,7 +61,11 @@ export function MenuItemDialog({ item, open, onOpenChange }: MenuItemDialogProps
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
   const [specialInstructions, setSpecialInstructions] = useState("");
   
-  const canteen = canteens.find(c => c.id === item.canteenId);
+  const { data: canteenData } = useQuery(GET_CANTEEN_BY_ID, {
+    variables: { id: item.canteenId },
+    skip: item.canteenId == null,
+  });
+  const canteen = canteenData?.getCanteenById;
   
   // Calculate total price including customizations
   const calculateTotalPrice = () => {
@@ -149,9 +155,10 @@ export function MenuItemDialog({ item, open, onOpenChange }: MenuItemDialogProps
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <div className="relative h-48 sm:h-64 -mx-6 -mt-6 mb-4">
           <img
-            src={item.image}
+            src={ensureImageSrc(item.image, item.id, 960, 640)}
             alt={item.name}
             className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 960, 640); }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
           <div className="absolute bottom-4 left-4 right-4">

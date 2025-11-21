@@ -4,11 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, ShoppingCart, CheckCircle, AlertTriangle, MenuSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { menuItems } from '@/data/mockData';
+import { useQuery } from '@apollo/client';
+import { GET_MENU_ITEMS } from '@/gql/queries/menuItems';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const VendorDashboard = () => {
   const navigate = useNavigate();
+  const { data: menuData } = useQuery(GET_MENU_ITEMS, { fetchPolicy: 'cache-first' });
+  const menuItems = menuData?.getMenuItems || [];
 
   return (
     <VendorLayout>
@@ -19,7 +22,7 @@ const VendorDashboard = () => {
           <DashboardCard
             title="Total Orders"
             value="125"
-            icon={<ShoppingCart className="h-6 w-6 text-blue-500" />}
+            icon={<ShoppingCart className="h-6 w-6 text-primary" />}
             description="All orders received"
             buttonText="View Orders"
             buttonAction={() => navigate('/vendor/orders')}
@@ -27,7 +30,7 @@ const VendorDashboard = () => {
           <DashboardCard
             title="Completed Orders"
             value="110"
-            icon={<CheckCircle className="h-6 w-6 text-green-500" />}
+            icon={<CheckCircle className="h-6 w-6 text-primary" />}
             description="Orders successfully delivered"
             buttonText="View Orders"
             buttonAction={() => navigate('/vendor/orders')}
@@ -35,7 +38,7 @@ const VendorDashboard = () => {
           <DashboardCard
             title="Total Menu Items"
             value={menuItems.length.toString()}
-            icon={<MenuSquare className="h-6 w-6 text-orange-500" />}
+            icon={<MenuSquare className="h-6 w-6 text-primary" />}
             description="Manage your menu items"
             buttonText="Manage Menu"
             buttonAction={() => navigate('/vendor/menu')}
@@ -48,8 +51,8 @@ const VendorDashboard = () => {
               <CardTitle>Popular Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <PopularItems />
-            </CardContent>
+                <PopularItems menuItems={menuItems} />
+              </CardContent>
           </Card>
 
           <Card>
@@ -57,18 +60,18 @@ const VendorDashboard = () => {
               <CardTitle>Low Stock Items</CardTitle>
             </CardHeader>
             <CardContent>
-              <LowStockItems />
+              <LowStockItems menuItems={menuItems} />
             </CardContent>
           </Card>
         </div>
 
         <div className="mt-8">
           <AlertCard
-            icon={<AlertTriangle className="h-12 w-12 text-orange-500" />}
+            icon={<AlertTriangle className="h-12 w-12 text-destructive" />}
             title="Low Stock Items"
             description="Some items are running low on stock."
             buttonText="View Inventory"
-            buttonAction={() => navigate('/vendor/menu')}
+            buttonAction={() => navigate('/vendor/inventory')}
             variant="default"
           />
         </div>
@@ -113,13 +116,13 @@ const DashboardCard: React.FC<DashboardCardProps> = ({
   </Card>
 );
 
-const PopularItems = () => {
+const PopularItems = ({ menuItems }: { menuItems: any[] }) => {
   // Convert to match the data type
-  const vendorItems = menuItems.filter(item => String(item.canteenId) === "1");
-  
+  const vendorItems = (menuItems || []).filter((item: any) => String(item.canteenId) === "1");
+
   // Sort by rating count instead of orderCount
-  const sortedItems = [...vendorItems].sort((a, b) => b.ratingCount - a.ratingCount);
-  
+  const sortedItems = [...vendorItems].sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0));
+
   return (
     <ul className="space-y-2">
       {sortedItems.slice(0, 3).map((item) => (
@@ -132,12 +135,12 @@ const PopularItems = () => {
   );
 };
 
-const LowStockItems = () => {
-  const vendorItems = menuItems.filter(item => String(item.canteenId) === "1");
-  
+const LowStockItems = ({ menuItems }: { menuItems: any[] }) => {
+  const vendorItems = (menuItems || []).filter((item: any) => String(item.canteenId) === "1");
+
   // Use a fixed number for demo purposes, or add stockCount to the items
   const lowStockItems = vendorItems.slice(0, 3); // Just take first 3 for demo
-  
+
   return (
     <ul className="space-y-2">
       {lowStockItems.map((item) => (

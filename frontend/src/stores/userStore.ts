@@ -1,43 +1,40 @@
-
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { client as apolloClient } from '@/gql/client';
+import { GET_CURRENT_USER_QUERY } from '@/gql/queries/user_queries';
+import { LOGOUT_MUTATION } from '@/gql/mutations/auth_mutations';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'student' | 'faculty' | 'staff';
-  department?: string;
-  canteenCredits?: number;
+  role: string;
 }
 
 interface UserState {
-  isAuthenticated: boolean;
   user: User | null;
+  init: () => Promise<void>;
   login: (user: User) => void;
-  logout: () => void;
-  updateUser: (data: Partial<User>) => void;
-  addCanteenCredits: (amount: number) => void;
+  logout: () => Promise<void>;
 }
 
-export const useUserStore = create<UserState>()(
-  persist(
-    (set) => ({
-      isAuthenticated: false,
-      user: null,
-      login: (user) => set({ isAuthenticated: true, user }),
-      logout: () => set({ isAuthenticated: false, user: null }),
-      updateUser: (data) => set((state) => ({
-        user: state.user ? { ...state.user, ...data } : null
-      })),
-      addCanteenCredits: (amount) => set((state) => ({
-        user: state.user 
-          ? { ...state.user, canteenCredits: (state.user.canteenCredits || 0) + amount } 
-          : null
-      }))
-    }),
-    {
-      name: 'user-storage',
+export const useUserStore = create<UserState>((set) => ({
+  user: null,
+  init: async () => {
+    try {
+      const { data } = await apolloClient.query({
+        query: GET_CURRENT_USER_QUERY,
+        fetchPolicy: 'network-only',
+      });
+      if (data?.getCurrentUser) {
+        set({ user: data.getCurrentUser });
+      }
+    } catch (error) {
+      // User is not authenticated
     }
-  )
-);
+  },
+  login: (user) => set({ user }),
+  logout: async () => {
+    await apolloClient.mutate({ mutation: LOGOUT_MUTATION });
+    set({ user: null });
+  },
+}));

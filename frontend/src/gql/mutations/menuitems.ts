@@ -85,6 +85,15 @@ export const DELETE_MENU_ITEM = gql`
   }
 `;
 
+export const SET_MENU_ITEM_STOCK = gql`
+  mutation SetMenuItemStock($itemId: Int!, $stockCount: Int!) {
+    setMenuItemStock(itemId: $itemId, stockCount: $stockCount) {
+      id
+      stockCount
+    }
+  }
+`;
+
 // Input types for customization options
 export const CUSTOMIZATION_OPTIONS_INPUT = gql`
   input SizeOptionInput {

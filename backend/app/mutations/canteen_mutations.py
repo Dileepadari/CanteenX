@@ -1,265 +1,152 @@
 import strawberry
-from typing import Optional
-from datetime import time, datetime
-from app.models.canteen import Canteen
+from datetime import datetime
+from strawberry.types import Info
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from graphql import GraphQLError
+
+from app.models.canteen import Canteen, CreateCanteenInput, CanteenMutationResponse, UpdateCanteenInput
 from app.models.user import User
-from app.core.database import get_db
-import strawberry
-from typing import List, Optional, Dict
+
+def _get_and_verify_user_role(db: Session, user_id: str, expected_role: str):
+    """Fetches a user and raises an error if they don't have the expected role."""
+    # Coerce user_id to string to avoid SQL type mismatch if an int is passed.
+    user = db.query(User).filter(User.id == str(user_id)).first()
+    if not user or user.role != expected_role:
+        raise GraphQLError(f"Unauthorized: Only a user with role '{expected_role}' can perform this action.")
+    return user
+
+def _get_and_verify_canteen_owner(db: Session, canteen_id: int, user_id: str):
+    """Fetches a canteen and raises an error if it's not found or the user is not the owner."""
+    canteen = db.query(Canteen).filter(Canteen.id == canteen_id).first()
+    if not canteen:
+        raise GraphQLError("Canteen not found.")
+    if canteen.userId != user_id:
+        raise GraphQLError("Unauthorized: You are not the owner of this canteen.")
+    return canteen
 
 @strawberry.type
-class CanteenMutationResponse:
-    success: bool
-    message: str
-    canteenId: Optional[int] = None
-
-@strawberry.type
-class Mutation:
+class CanteenMutations:
     @strawberry.mutation
-    def create_canteen(
-        self,
-        currUserId: str,
-        userId: str,
-        name: str,
-        location: str,
-        phone: str,
-        openTime: str,  # Format: "HH:MM"
-        closeTime: str,  # Format: "HH:MM"
-        description: Optional[str] = None,
-        image: Optional[str] = None,
-        email: Optional[str] = None,
-        schedule: Optional[Dict[str, Optional[str]]] = None,
-        tags: Optional[List[str]] = None
-    ) -> CanteenMutationResponse:
-        """Create a new canteen"""
-        db = next(get_db())
+    def create_canteen(self, info: Info, input: CreateCanteenInput) -> CanteenMutationResponse:
+        """Create a new canteen. Requires admin privileges."""
+        db: Session = info.context["db"]
+        current_user_id = info.context["user"].id # Assuming current user is in context
         
-        # Verify admin authorization
-        user = db.query(User).filter(User.id == currUserId).first()
-        if user.role != "admin":
-            return CanteenMutationResponse(
-                success=False,
-                message="Unauthorized: Only admins can create canteens"
-            )
-        
-        # Check if canteen with phone already exists
-        if db.query(Canteen).filter(Canteen.phone == phone).first():
-            return CanteenMutationResponse(
-                success=False,
-                message="Canteen with this phone already exists"
-            )
-            
-        try:
-            # Parse time strings
-            dt = None
-            try:
-                dt = datetime.strptime(openTime, "%H:%M")
-                openTime_obj = time(dt.hour, dt.minute)
-                dt = datetime.strptime(closeTime, "%H:%M")
-                closeTime_obj = time(dt.hour, dt.minute)
-            except ValueError:
-                return CanteenMutationResponse(
-                    success=False,
-                    message="Invalid time format. Use HH:MM format (e.g., '07:30')"
-                )
+        _get_and_verify_user_role(db, current_user_id, "admin")
 
-            new_canteen = Canteen(
-                name=name,
-                location=location,
-                phone=phone,
-                openTime=openTime,
-                closeTime=closeTime,
-                description=description,
-                image=image,
-                email=email,
-                schedule=schedule,
-                tags=tags,
-                rating=0.0,
-                isOpen=True,
-                userId=userId
-            )
+        try:
+            # Time validation
+            datetime.strptime(input.open_time, "%H:%M")
+            datetime.strptime(input.close_time, "%H:%M")
+        except ValueError:
+            raise GraphQLError("Invalid time format. Please use 'HH:MM'.")
+
+        new_canteen = Canteen(
+            name=input.name,
+            location=input.location,
+            phone=input.phone,
+            openTime=input.open_time,
+            closeTime=input.close_time,
+            description=input.description,
+            image=input.image,
+            email=input.email,
+            schedule=input.schedule,
+            tags=input.tags,
+            rating=0.0,
+            isOpen=True,
+            userId=input.user_id
+        )
+
+        try:
             db.add(new_canteen)
             db.commit()
-            return CanteenMutationResponse(
-                success=True,
-                message="Canteen created successfully",
-                canteenId=new_canteen.id
-            )
+            db.refresh(new_canteen)
+        except IntegrityError:
+            db.rollback()
+            raise GraphQLError("A canteen with this phone number or email already exists.")
         except Exception as e:
             db.rollback()
-            return CanteenMutationResponse(
-                success=False,
-                message=f"Failed to create canteen: {str(e)}"
-            )
+            raise GraphQLError(f"Failed to create canteen: {e}")
+
+        return CanteenMutationResponse(
+            success=True,
+            message="Canteen created successfully",
+            canteen_id=new_canteen.id
+        )
 
     @strawberry.mutation
-    def update_canteen(
-        self,
-        canteenId: int,
-        userId: str,
-        name: Optional[str] = None,
-        location: Optional[str] = None,
-        phone: Optional[str] = None,
-        openTime: Optional[str] = None,
-        closeTime: Optional[str] = None,
-        description: Optional[str] = None,
-        image: Optional[str] = None,
-        isOpen: Optional[bool] = None,
-        email: Optional[str] = None,
-        schedule: Optional[Dict[str, Optional[str]]] = None,
-        tags: Optional[List[str]] = None
-    ) -> CanteenMutationResponse:
-        """Update canteen details"""
-        db = next(get_db())
-        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
-        
-        if not canteen:
-            return CanteenMutationResponse(success=False, message="Canteen not found")
-            
-        # Verify vendor authorization
-        if canteen.userId != userId:
-            return CanteenMutationResponse(
-                success=False,
-                message="Unauthorized: Only the canteen owner can update details"
-            )
-            
+    def update_canteen(self, info: Info, canteen_id: int, input: UpdateCanteenInput) -> CanteenMutationResponse:
+        """Update canteen details. Requires canteen owner privileges."""
+        db: Session = info.context["db"]
+        current_user_id = info.context["user"].id
+
+        canteen = _get_and_verify_canteen_owner(db, canteen_id, current_user_id)
+
+        # Dynamically update fields that were provided
+        for field, value in input.__dict__.items():
+            if value is not strawberry.UNSET:
+                # Map snake_case input fields to camelCase model fields if necessary
+                model_field = field.replace('_', '')
+                model_field = model_field[0] + model_field[1:].capitalize() if '_' in field else field
+                if hasattr(canteen, model_field): # A simple mapping example
+                    setattr(canteen, model_field, value)
+                elif hasattr(canteen, field): # If model uses snake_case
+                    setattr(canteen, field, value)
+
         try:
-            if name: canteen.name = name
-            if location: canteen.location = location
-            if phone: canteen.phone = phone
-            if openTime: canteen.openTime = openTime
-            if closeTime: canteen.closeTime = closeTime
-            if description is not None: canteen.description = description
-            if image is not None: canteen.image = image
-            if isOpen is not None: canteen.isOpen = isOpen
-            if email is not None: canteen.email = email
-            if schedule is not None: canteen.schedule = schedule
-            if tags is not None: canteen.tags = tags
-            
             db.commit()
-            return CanteenMutationResponse(
-                success=True,
-                message="Canteen updated successfully",
-                canteenId=canteen.id
-            )
         except Exception as e:
             db.rollback()
-            return CanteenMutationResponse(
-                success=False,
-                message=f"Failed to update canteen: {str(e)}"
-            )
+            raise GraphQLError(f"Failed to update canteen: {e}")
+
+        return CanteenMutationResponse(
+            success=True,
+            message="Canteen updated successfully",
+            canteen_id=canteen.id
+        )
 
     @strawberry.mutation
-    def delete_canteen(
-        self,
-        canteenId: int,
-        currUserId: str,
-    ) -> CanteenMutationResponse:
-        """Delete a canteen"""
-        db = next(get_db())
+    def delete_canteen(self, info: Info, canteen_id: int) -> CanteenMutationResponse:
+        """Delete a canteen. Requires admin privileges."""
+        db: Session = info.context["db"]
+        current_user_id = info.context["user"].id
+
+        _get_and_verify_user_role(db, current_user_id, "admin")
         
-        # Verify admin authorization
-        admin = db.query(User).filter(User.id == currUserId).first()
-        if not admin or admin.role != "admin":
-            return CanteenMutationResponse(
-                success=False,
-                message="Unauthorized: Only admins can delete canteens"
-            )
-            
-        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
+        canteen = db.query(Canteen).filter(Canteen.id == canteen_id).first()
         if not canteen:
-            return CanteenMutationResponse(success=False, message="Canteen not found")
+            raise GraphQLError("Canteen not found.")
             
         try:
             db.delete(canteen)
             db.commit()
-            return CanteenMutationResponse(
-                success=True,
-                message="Canteen deleted successfully"
-            )
         except Exception as e:
             db.rollback()
-            return CanteenMutationResponse(
-                success=False,
-                message=f"Failed to delete canteen: {str(e)}"
-            )
+            raise GraphQLError(f"Failed to delete canteen: {e}")
 
-    @strawberry.mutation
-    def update_canteen_status(
-        self,
-        canteenId: int,
-        isOpen: bool,
-        userId: str,  # For authorization
-    ) -> CanteenMutationResponse:
-        """Update canteen open/closed status"""
-        db = next(get_db())
-        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
+        return CanteenMutationResponse(
+            success=True,
+            message="Canteen deleted successfully"
+        )
         
-        if not canteen:
-            return CanteenMutationResponse(success=False, message="Canteen not found")
-            
-        # Verify vendor authorization
-        if canteen.userId != userId:
-            return CanteenMutationResponse(
-                success=False,
-                message="Unauthorized: Only the canteen owner can update status"
-            )
-            
-        try:
-            canteen.isOpen = isOpen
-            db.commit()
-            return CanteenMutationResponse(
-                success=True,
-                message=f"Canteen status updated to {'open' if isOpen else 'closed'}",
-                canteenId=canteen.id
-            )
-        except Exception as e:
-            db.rollback()
-            return CanteenMutationResponse(
-                success=False,
-                message=f"Failed to update canteen status: {str(e)}"
-            )
-
     @strawberry.mutation
-    def toggle_canteen(
-        self,
-        canteenId: int,
-        userId: str,
-        isOpen: bool,
-    ) -> CanteenMutationResponse:
-        """Toggle canteen open/closed status"""
-        db = next(get_db())
-        canteen = db.query(Canteen).filter(Canteen.id == canteenId).first()
+    def update_canteen_status(self, info: Info, canteen_id: int, is_open: bool) -> CanteenMutationResponse:
+        """Update canteen open/closed status. Requires canteen owner privileges."""
+        db: Session = info.context["db"]
+        current_user_id = info.context["user"].id
+
+        canteen = _get_and_verify_canteen_owner(db, canteen_id, current_user_id)
         
-        if not canteen:
-            return CanteenMutationResponse(success=False, message="Canteen not found")
-            
-        # Verify vendor authorization
-        if canteen.userId != userId:
-            return CanteenMutationResponse(
-                success=False,
-                message="Unauthorized: Only the canteen owner can toggle status"
-            )
-            
         try:
-            canteen.isOpen = isOpen
+            canteen.isOpen = is_open
             db.commit()
-            return CanteenMutationResponse(
-                success=True,
-                message=f"Canteen status updated to {'open' if isOpen else 'closed'}",
-                canteenId=canteen.id
-            )
         except Exception as e:
             db.rollback()
-            return CanteenMutationResponse(
-                success=False,
-                message=f"Failed to update canteen status: {str(e)}"
-            )
+            raise GraphQLError(f"Failed to update canteen status: {e}")
 
-mutations = [
-    strawberry.field(name="createCanteen", resolver=Mutation.create_canteen),
-    strawberry.field(name="updateCanteen", resolver=Mutation.update_canteen),
-    strawberry.field(name="deleteCanteen", resolver=Mutation.delete_canteen),
-    strawberry.field(name="updateCanteenStatus", resolver=Mutation.update_canteen_status),
-    strawberry.field(name="toggleCanteen", resolver=Mutation.toggle_canteen),
-]
+        return CanteenMutationResponse(
+            success=True,
+            message=f"Canteen status updated to {'open' if is_open else 'closed'}",
+            canteen_id=canteen.id
+        )

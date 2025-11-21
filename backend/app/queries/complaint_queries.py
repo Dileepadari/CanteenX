@@ -1,106 +1,57 @@
 import strawberry
 from typing import List, Optional
-from app.models.complaints import ComplaintType, Complaint
-from app.core.database import get_db
+from strawberry.types import Info
+from sqlalchemy.orm import Session
 
-def resolve_get_all_complaints() -> List[ComplaintType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific user
-    complaints = db.query(Complaint).all()
-    
-    return [ComplaintType(
-        id=complaint.id,
-        userId=complaint.userId,
-        orderId=complaint.orderId,
-        complaintText=complaint.complaintText,
-        heading=complaint.heading,
-        complaintType=complaint.complaintType,
-        status=complaint.status,
-        isEscalated=complaint.isEscalated,
-        responseText=complaint.responseText,
-        createdAt=complaint.createdAt,
-        updatedAt=complaint.updatedAt
-    ) for complaint in complaints]
+from app.models.complaints import Complaint, ComplaintType
 
-
-def resolve_get_complaint_by_id(complaintId: int) -> Optional[ComplaintType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific complaint
-    complaint = db.query(Complaint).filter(Complaint.id == complaintId).first()
-    
-    if not complaint:
-        return None
+def convert_complaint_model_to_type(complaint: Complaint) -> ComplaintType:
+    """Converts a Complaint SQLAlchemy model to a ComplaintType."""
+    def _iso(dt):
+        return dt.isoformat() if dt is not None else None
 
     return ComplaintType(
         id=complaint.id,
-        userId=complaint.userId,
-        orderId=complaint.orderId,
-        complaintText=complaint.complaintText,
+        userId=complaint.user_id,
+        orderId=complaint.order_id,
+        complaintText=complaint.complaint_text,
         heading=complaint.heading,
-        complaintType=complaint.complaintType,
+        complaintType=complaint.complaint_type,
         status=complaint.status,
-        isEscalated=complaint.isEscalated,
-        responseText=complaint.responseText,
-        createdAt=complaint.createdAt,
-        updatedAt=complaint.updatedAt
+        isEscalated=complaint.is_escalated,
+        responseText=complaint.response_text,
+        createdAt=_iso(complaint.created_at),
+        updatedAt=_iso(complaint.updated_at),
     )
 
-def resolve_get_complaints_by_user_id(userId: str) -> List[ComplaintType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific user
-    complaints = db.query(Complaint).filter(Complaint.userId == userId).all()
-    
-    return [ComplaintType(
-        id=complaint.id,
-        userId=complaint.userId,
-        orderId=complaint.orderId,
-        complaintText=complaint.complaintText,
-        heading=complaint.heading,
-        complaintType=complaint.complaintType,
-        status=complaint.status,
-        isEscalated=complaint.isEscalated,
-        responseText=complaint.responseText,
-        createdAt=complaint.createdAt,
-        updatedAt=complaint.updatedAt
-    ) for complaint in complaints]
-    
-def resolve_get_complaints_by_order_id(orderId: int) -> List[ComplaintType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific order
-    complaints = db.query(Complaint).filter(Complaint.orderId == orderId).all()
-    
-    return [ComplaintType(
-        id=complaint.id,
-        userId=complaint.userId,
-        orderId=complaint.orderId,
-        complaintText=complaint.complaintText,
-        heading=complaint.heading,
-        complaintType=complaint.complaintType,
-        status=complaint.status,
-        isEscalated=complaint.isEscalated,
-        responseText=complaint.responseText,
-        createdAt=complaint.createdAt,
-        updatedAt=complaint.updatedAt
-    ) for complaint in complaints]
+@strawberry.type
+class ComplaintQueries:
+    @strawberry.field
+    def get_all_complaints(self, info: Info) -> List[ComplaintType]:
+        """Get all complaints."""
+        db: Session = info.context["db"]
+        complaints = db.query(Complaint).all()
+        return [convert_complaint_model_to_type(c) for c in complaints]
 
-# Create properly decorated fields with resolvers and matching frontend field names
-getAllComplaints = strawberry.field(name="getAllComplaints", resolver=resolve_get_all_complaints)
-getComplaintById = strawberry.field(name="getComplaintById", resolver=resolve_get_complaint_by_id)
-getComplaintsByUserId = strawberry.field(name="getComplaintsByUserId", resolver=resolve_get_complaints_by_user_id)
-getComplaintsByOrderId = strawberry.field(name="getComplaintsByOrderId", resolver=resolve_get_complaints_by_order_id)
+    @strawberry.field
+    def get_complaint_by_id(self, complaint_id: int, info: Info) -> Optional[ComplaintType]:
+        """Get a specific complaint by its ID."""
+        db: Session = info.context["db"]
+        complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+        if not complaint:
+            return None
+        return convert_complaint_model_to_type(complaint)
 
-# Add the queries to the list
-queries = [
-    getAllComplaints,
-    getComplaintById,
-    getComplaintsByUserId,
-    getComplaintsByOrderId,
-]
+    @strawberry.field
+    def get_complaints_by_user_id(self, user_id: str, info: Info) -> List[ComplaintType]:
+        """Get all complaints filed by a specific user."""
+        db: Session = info.context["db"]
+        complaints = db.query(Complaint).filter(Complaint.user_id == user_id).all()
+        return [convert_complaint_model_to_type(c) for c in complaints]
+
+    @strawberry.field
+    def get_complaints_by_order_id(self, order_id: int, info: Info) -> List[ComplaintType]:
+        """Get all complaints related to a specific order."""
+        db: Session = info.context["db"]
+        complaints = db.query(Complaint).filter(Complaint.order_id == order_id).all()
+        return [convert_complaint_model_to_type(c) for c in complaints]

@@ -50,8 +50,8 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
       <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <Link to="/vendor/dashboard" className="flex items-center">
-            <span className="text-xl font-bold text-canteen-orange">Smart</span>
-            <span className="text-xl font-bold text-canteen-blue">Canteen</span>
+            <span className="text-xl font-bold text-primary">Smart</span>
+            <span className="text-xl font-bold text-muted-foreground">Canteen</span>
           </Link>
           <div className="mt-2 text-sm text-gray-500">Vendor Portal</div>
         </div>
@@ -63,8 +63,8 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
               to={item.path}
               className={`flex items-center px-3 py-2 rounded-md ${
                 location.pathname === item.path
-                  ? 'bg-canteen-orange/10 text-canteen-orange'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-muted/10 text-primary'
+                  : 'text-gray-600 hover:bg-muted'
               }`}
             >
               <item.icon className="h-5 w-5 mr-3" />
@@ -76,7 +76,7 @@ const VendorLayout = ({ children }: VendorLayoutProps) => {
         <div className="p-4 border-t border-gray-200">
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="w-full justify-start text-destructive hover:text-destructive/90 hover:bg-destructive/10"
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5 mr-3" />

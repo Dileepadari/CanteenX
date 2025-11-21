@@ -88,3 +88,55 @@ export const GET_OPEN_CANTEENS = gql`
     }
   }
 `;
+
+// Admin: Get canteen detail with menu, complaints and owner/staff info
+export const GET_CANTEEN_DETAIL = gql`
+  query GetCanteenDetail($id: Int!) {
+    getCanteenDetail(canteenId: $id) {
+      id
+      name
+      location
+      image
+      rating
+      openTime
+      closeTime
+      isOpen
+      description
+      phone
+      email
+      tags
+      owner {
+        id
+        name
+        email
+        role
+      }
+      menuItems {
+        id
+        name
+        price
+        stockCount
+        isAvailable
+        customizationOptions {
+          sizes { name price }
+          additions { name price }
+          removals
+        }
+      }
+      complaints {
+        id
+        heading
+        complaintText
+        status
+        isEscalated
+        responseText
+        createdAt
+        user {
+          id
+          name
+          email
+        }
+      }
+    }
+  }
+`;

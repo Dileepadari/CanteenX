@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
-import { menuItems, canteens } from '@/data/mockData';
+import { useQuery } from '@apollo/client';
+import { GET_MENU_ITEMS } from '@/gql/queries/menuItems';
+import { GET_CANTEEN_BY_ID } from '@/gql/queries/canteens';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -19,11 +21,17 @@ const Feedback = () => {
   // Convert string ID to number for comparison
   const numericItemId = itemId ? parseInt(itemId, 10) : undefined;
   
-  // Find menu item by id if provided
-  const menuItem = numericItemId ? menuItems.find(item => item.id === numericItemId) : undefined;
-  
-  // Find canteen by id if menu item is found
-  const canteen = menuItem ? canteens.find(c => c.id === menuItem.canteenId) : undefined;
+  // Find menu item by id if provided (fetch menu items via GraphQL)
+  const { data: menuData } = useQuery(GET_MENU_ITEMS);
+  const fetchedMenuItems = menuData?.getMenuItems || [];
+  const menuItem = numericItemId ? fetchedMenuItems.find((item: any) => item.id === numericItemId) : undefined;
+
+  // Find canteen by id via GraphQL if menu item is found
+  const { data: canteenData } = useQuery(GET_CANTEEN_BY_ID, {
+    variables: { id: menuItem?.canteenId },
+    skip: !menuItem?.canteenId,
+  });
+  const canteen = canteenData?.getCanteenById;
   
   return (
     <MainLayout>
@@ -51,19 +59,19 @@ const Feedback = () => {
                     <TabsTrigger value="complaint">File a Complaint</TabsTrigger>
                   </TabsList>
                   <TabsContent value="review">
-                    <ReviewForm menuItem={menuItem} onSubmit={() => {
+                    <ReviewForm itemId={menuItem?.id} canteenId={menuItem?.canteenId} onSubmitSuccess={() => {
                       addNotification({
                         title: "Review Submitted",
-                        description: `Thank you for your review of ${menuItem.name}!`,
+                        description: `Thank you for your review of ${menuItem?.name || 'the item'}!`,
                         type: "success",
                       });
                     }} />
                   </TabsContent>
                   <TabsContent value="complaint">
-                    <ComplaintForm menuItem={menuItem} onSubmit={() => {
+                    <ComplaintForm canteenId={menuItem?.canteenId} onSubmitSuccess={() => {
                       addNotification({
                         title: "Complaint Submitted",
-                        description: `Your complaint about ${menuItem.name} has been submitted.`,
+                        description: `Your complaint about ${menuItem?.name || 'the item'} has been submitted.`,
                         type: "info",
                       });
                     }} />

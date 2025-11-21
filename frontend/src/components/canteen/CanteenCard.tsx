@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Clock, MapPin, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
 
 interface CanteenCardProps {
   canteen: {
@@ -24,9 +25,10 @@ const CanteenCard: React.FC<CanteenCardProps> = ({ canteen }) => {
       <Card className="overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
         <div className="relative h-48 w-full overflow-hidden">
           <img
-            src={canteen.image}
+            src={ensureImageSrc(canteen.image, canteen.id, 800, 480)}
             alt={canteen.name}
             className="h-full w-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(canteen.id, 800, 480); }}
           />
           <div className="absolute top-3 right-3">
             <Badge variant={canteen.isOpen ? "success" : "destructive"}>
@@ -38,11 +40,11 @@ const CanteenCard: React.FC<CanteenCardProps> = ({ canteen }) => {
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-lg font-bold">{canteen.name}</h3>
             <div className="flex items-center">
-              <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 mr-1" />
+              <Star className="h-4 w-4 text-primary mr-1" />
               <span className="text-sm font-medium">{canteen.rating}</span>
             </div>
           </div>
-          <div className="space-y-2 text-sm text-gray-500">
+          <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center">
               <MapPin className="h-4 w-4 mr-1" />
               <span>{canteen.location}</span>

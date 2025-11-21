@@ -30,6 +30,7 @@ export const GET_MENU_ITEMS = gql`
         }
         removals
       }
+        stockCount
     }
   }
 `;
@@ -64,6 +65,7 @@ export const GET_MENU_ITEMS_BY_CANTEEN = gql`
         }
         removals
       }
+      stockCount
     }
   }
 `;
@@ -98,6 +100,7 @@ export const SEARCH_MENU_ITEMS = gql`
         }
         removals
       }
+      stockCount
     }
   }
 `;

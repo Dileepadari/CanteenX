@@ -15,8 +15,10 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import { formatIST } from '@/lib/ist';
 import { useQuery } from '@apollo/client';
 import { GET_ORDER_BY_ID } from '@/gql/queries/orders';
+import { GET_MENU_ITEMS } from '@/gql/queries/menuItems';
 
 // Order status badge component
 const OrderStatusBadge = ({ status, className = '' }) => {
@@ -25,28 +27,28 @@ const OrderStatusBadge = ({ status, className = '' }) => {
 
   switch (status) {
     case 'pending':
-      bgColor = 'bg-yellow-100';
-      textColor = 'text-yellow-800';
+      bgColor = 'bg-muted/10';
+      textColor = 'text-primary';
       break;
     case 'confirmed':
-      bgColor = 'bg-blue-100';
-      textColor = 'text-blue-800';
+      bgColor = 'bg-primary/10';
+      textColor = 'text-primary';
       break;
     case 'preparing':
-      bgColor = 'bg-orange-100';
-      textColor = 'text-orange-800';
+      bgColor = 'bg-muted/10';
+      textColor = 'text-primary';
       break;
     case 'ready':
-      bgColor = 'bg-green-100';
-      textColor = 'text-green-800';
+      bgColor = 'bg-primary/10';
+      textColor = 'text-primary';
       break;
     case 'delivered':
-      bgColor = 'bg-green-100';
-      textColor = 'text-green-800';
+      bgColor = 'bg-primary/10';
+      textColor = 'text-primary';
       break;
     case 'cancelled':
-      bgColor = 'bg-red-100';
-      textColor = 'text-red-800';
+      bgColor = 'bg-destructive/10';
+      textColor = 'text-destructive';
       break;
   }
 
@@ -94,11 +96,7 @@ const OrderTracking = () => {
   // Format time function
   const formatTime = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatIST(dateString, { hour: '2-digit', minute: '2-digit' });
   };
 
   // Calculate estimated time remaining
@@ -123,6 +121,53 @@ const OrderTracking = () => {
     }
   };
 
+  // Safe numeric helpers and derived amounts to avoid NaN in UI
+  const toNumber = (v: any) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const itemsList = order?.items || [];
+  // Fetch menu items (used to enrich order items with name/price when order doesn't snapshot them)
+  const { data: menuData } = useQuery(GET_MENU_ITEMS, { fetchPolicy: 'cache-first' });
+  const menuItems = menuData?.getMenuItems || [];
+  const menuById: Record<number, any> = menuItems.reduce((acc: any, it: any) => {
+    acc[it.id] = it;
+    return acc;
+  }, {} as Record<number, any>);
+  const subtotalCalc = order
+    ? typeof order.subtotal === 'number'
+      ? order.subtotal
+      : itemsList.reduce((sum: number, it: any) => {
+          const menuPrice = menuById[it.itemId]?.price;
+          return sum + (toNumber(it.price) || toNumber(menuPrice)) * toNumber(it.quantity);
+        }, 0)
+    : 0;
+
+  const taxAmount = order
+    ? typeof order.tax === 'number'
+      ? order.tax
+      : typeof order.taxPercentage === 'number'
+      ? +(subtotalCalc * (order.taxPercentage / 100))
+      : typeof order.totalAmount === 'number'
+      ? Math.max(0, toNumber(order.totalAmount) - subtotalCalc)
+      : 0
+    : 0;
+
+  const totalCalc = order
+    ? typeof order.totalAmount === 'number'
+      ? order.totalAmount
+      : +(subtotalCalc + taxAmount)
+    : 0;
+
+  // Totals used for distribution when item-level prices are not available
+  const totalQuantity = itemsList.reduce((s: number, it: any) => s + toNumber(it.quantity), 0) || 1;
+  const baseAmountForDistribution = typeof order?.subtotal === 'number' && order.subtotal > 0
+    ? order.subtotal
+    : typeof order?.totalAmount === 'number'
+    ? Math.max(0, order.totalAmount - taxAmount)
+    : subtotalCalc;
+
   // Handle contact canteen
   const handleContactCanteen = () => {
     toast({
@@ -136,7 +181,7 @@ const OrderTracking = () => {
       <MainLayout>
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 text-orange-500 animate-spin mr-2" />
+            <Loader2 className="h-8 w-8 text-primary animate-spin mr-2" />
             <span>Loading order details...</span>
           </div>
         </div>
@@ -150,7 +195,7 @@ const OrderTracking = () => {
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-8">
-              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
               <h2 className="text-xl font-bold mb-2">Error Loading Order</h2>
               <p className="text-gray-500 mb-6">{error.message}</p>
               <Button onClick={() => window.location.reload()}>Try Again</Button>
@@ -167,7 +212,7 @@ const OrderTracking = () => {
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="flex flex-col items-center justify-center p-8">
-              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
               <h2 className="text-xl font-bold mb-2">Order Not Found</h2>
               <p className="text-gray-500 mb-6">We couldn't find the order you're looking for.</p>
               <Button onClick={() => navigate('/menu')}>Browse Menu</Button>
@@ -213,7 +258,7 @@ const OrderTracking = () => {
                   <div>
                     <p className="text-sm text-gray-500">Current Time</p>
                     <p className="font-medium">
-                      {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatIST(currentTime, { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -225,10 +270,10 @@ const OrderTracking = () => {
                     <div
                       className={`rounded-full h-8 w-8 flex items-center justify-center ${
                         order.status === 'cancelled'
-                          ? 'bg-red-500'
+                          ? 'bg-destructive'
                           : ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)
-                          ? 'bg-green-500'
-                          : 'bg-gray-200'
+                          ? 'bg-primary'
+                          : 'bg-muted'
                       } z-10`}
                     >
                       {order.status === 'cancelled' ? (
@@ -262,8 +307,8 @@ const OrderTracking = () => {
                       <div
                         className={`rounded-full h-8 w-8 flex items-center justify-center ${
                           ['preparing', 'ready', 'delivered'].includes(order.status)
-                            ? 'bg-green-500'
-                            : 'bg-gray-200'
+                            ? 'bg-primary'
+                            : 'bg-muted'
                         } z-10`}
                       >
                         <ChefHat
@@ -293,8 +338,8 @@ const OrderTracking = () => {
                     <div className="flex relative">
                       <div
                         className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                          ['ready', 'delivered'].includes(order.status) ? 'bg-green-500' : 'bg-gray-200'
-                        } z-10`}
+                            ['ready', 'delivered'].includes(order.status) ? 'bg-primary' : 'bg-muted'
+                          } z-10`}
                       >
                         <Package
                           className={`h-5 w-5 ${
@@ -321,8 +366,8 @@ const OrderTracking = () => {
                     <div className="flex relative">
                       <div
                         className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                          order.status === 'delivered' ? 'bg-green-500' : 'bg-gray-200'
-                        } z-10`}
+                          order.status === 'delivered' ? 'bg-primary' : 'bg-muted'
+                          } z-10`}
                       >
                         {order.status === 'delivered' ? (
                           <CheckCircle className="h-5 w-5 text-white" />
@@ -358,42 +403,57 @@ const OrderTracking = () => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Order Items</h3>
                   <div className="space-y-2 mt-2">
-                    {console.log(order.items)}
-                    {order.items.map((item, index) => (
-                      <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
-                        <div>
-                          <p className="font-medium">
-                            {item.quantity}x {item.name}
-                          </p>
-                          {item.customizations && (
-                            <div className="text-xs text-gray-500">
-                              {item.customizations.size && <span>Size: {item.customizations.size} </span>}
-                              {item.customizations.additions?.length > 0 && (
-                                <span>
-                                  Additions: {item.customizations.additions.join(', ')}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                    {console.log(order?.items)}
+                    {itemsList.map((item: any, index: number) => {
+                      // Use item.price if provided by order snapshot; otherwise use menu item price if available
+                      const menuPrice = menuById[item.itemId]?.price;
+                      const unit = toNumber(item.price) || toNumber(menuPrice);
+                      const qty = toNumber(item.quantity);
+                      // If unit price is present use it; otherwise distribute base amount by quantity share
+                      const line = unit > 0
+                        ? +(unit * qty)
+                        : +(baseAmountForDistribution * (qty / totalQuantity));
+
+                      const displayName = menuById[item.itemId]?.name || item.note || `Item ${item.itemId}`;
+
+                      return (
+                        <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
+                          <div>
+                            <p className="font-medium">
+                              {qty}x {displayName}
+                            </p>
+                            {item.customizations && (
+                              <div className="text-xs text-gray-500">
+                                {item.customizations.size && <span>Size: {item.customizations.size} </span>}
+                                {item.customizations.additions?.length > 0 && (
+                                  <span>
+                                    Additions: {item.customizations.additions.join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <p>₹{line.toFixed(2)}</p>
                         </div>
-                        <p>₹{(item.price * item.quantity).toFixed(2)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 <div className="pt-4 border-t">
                   <div className="flex justify-between mb-1">
                     <span>Subtotal</span>
-                    <span>₹{order.subtotal?.toFixed(2) || (order.totalAmount * 0.95).toFixed(2)}</span>
+                    <span>₹{subtotalCalc.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-500 mb-1">
-                    <span>Tax (5%)</span>
-                    <span>₹{order.tax?.toFixed(2) || (order.totalAmount * 0.05).toFixed(2)}</span>
+                    <span>
+                      {typeof order?.taxPercentage === 'number' ? `Tax (${order.taxPercentage}%)` : 'Tax'}
+                    </span>
+                    <span>₹{taxAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total</span>
-                    <span>₹{order.totalAmount.toFixed(2)}</span>
+                    <span>₹{totalCalc.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -408,8 +468,8 @@ const OrderTracking = () => {
                     <span
                       className={
                         order.paymentStatus === 'Paid'
-                          ? 'text-green-600 font-medium'
-                          : 'text-orange-600 font-medium'
+                          ? 'text-primary font-medium'
+                          : 'text-muted-foreground font-medium'
                       }
                     >
                       {order.paymentStatus}
@@ -420,7 +480,7 @@ const OrderTracking = () => {
                 {order.customerNote && (
                   <div className="pt-4 border-t">
                     <h3 className="text-sm font-medium text-gray-500 mb-2">Order Notes</h3>
-                    <p className="text-sm bg-gray-50 p-2 rounded">{order.customerNote}</p>
+                    <p className="text-sm bg-muted/10 p-2 rounded">{order.customerNote}</p>
                   </div>
                 )}
 

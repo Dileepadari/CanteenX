@@ -1,136 +1,74 @@
 import strawberry
 from typing import List, Optional
-from app.models.canteen import Canteen
+from strawberry.types import Info
+from sqlalchemy.orm import Session
+from fastapi import Depends
+
+from app.models.canteen import Canteen, CanteenType, ScheduleType
 from app.core.database import get_db
 
+def convert_canteen_model_to_type(canteen: Canteen) -> CanteenType:
+    """Converts a Canteen SQLAlchemy model to a CanteenType."""
+    return CanteenType(
+        id=canteen.id,
+        name=canteen.name,
+        email=canteen.email,
+        image=canteen.image,
+        location=canteen.location,
+        rating=canteen.rating,
+        # Map SQLAlchemy snake_case fields to the GraphQL camelCase fields
+        openTime=(canteen.open_time.strftime("%H:%M") if getattr(canteen, "open_time", None) is not None else None),
+        closeTime=(canteen.close_time.strftime("%H:%M") if getattr(canteen, "close_time", None) is not None else None),
+        isOpen=bool(getattr(canteen, "is_open", False)),
+        description=canteen.description,
+        phone=canteen.phone,
+        userId=canteen.user_id,
+        # schedule=canteen.schedule, # Uncomment if you add this back to your type
+        tags=canteen.tags
+    )
 
 @strawberry.type
-class ScheduleType:
-    breakfast: Optional[str] = None
-    lunch: Optional[str] = None
-    dinner: Optional[str] = None
-    regular: Optional[str] = None
-    evening: Optional[str] = None
-    night: Optional[str] = None
-    weekday: Optional[str] = None
-    weekend: Optional[str] = None
-
-    
-@strawberry.type
-class CanteenType:
-    id: int
-    name: str
-    image: Optional[str]
-    location: str
-    rating: float
-    openTime: str
-    closeTime: str
-    isOpen: bool
-    description: Optional[str]
-    phone: str
-    userId: Optional[int]
-    email: Optional[str]
-    schedule: Optional[ScheduleType] = None
-    tags: Optional[List[str]] = None
-
-@strawberry.type
-class CanteenQuery:
+class CanteenQueries:
     @strawberry.field
-    def get_all_canteens(self) -> List[CanteenType]:
+    def get_all_canteens(self, info: Info) -> List[CanteenType]:
         """Get all canteens"""
-        db = next(get_db())
+        db: Session = info.context["db"]
         canteens = db.query(Canteen).all()
-        return [CanteenType(
-            id=canteen.id,
-            name=canteen.name,
-            email=canteen.email,
-            image=canteen.image,
-            location=canteen.location,
-            rating=canteen.rating,
-            openTime=canteen.openTime,
-            closeTime=canteen.closeTime,
-            isOpen=canteen.isOpen,
-            description=canteen.description,
-            phone=canteen.phone,
-            userId=canteen.userId,
-            # schedule=canteen.schedule,
-            tags=canteen.tags
-        ) for canteen in canteens]
+        return [convert_canteen_model_to_type(canteen) for canteen in canteens]
 
     @strawberry.field
-    def get_canteen_by_id(self, id: int) -> Optional[CanteenType]:
+    def get_canteen_by_id(self, id: int, info: Info) -> Optional[CanteenType]:
         """Get a specific canteen by ID"""
-        db = next(get_db())
+        db: Session = info.context["db"]
         canteen = db.query(Canteen).filter(Canteen.id == id).first()
         if not canteen:
             return None
-        return CanteenType(
-            id=canteen.id,
-            name=canteen.name,
-            email=canteen.email,
-            image=canteen.image,
-            location=canteen.location,
-            rating=canteen.rating,
-            openTime=canteen.openTime,
-            closeTime=canteen.closeTime,
-            isOpen=canteen.isOpen,
-            description=canteen.description,
-            phone=canteen.phone,
-            userId=canteen.userId,
-            # schedule=canteen.schedule,
-            tags=canteen.tags
-        )
+        return convert_canteen_model_to_type(canteen)
 
     @strawberry.field
-    def get_open_canteens(self) -> List[CanteenType]:
+    def get_open_canteens(self, info: Info) -> List[CanteenType]:
         """Get all currently open canteens"""
-        db = next(get_db())
-        canteens = db.query(Canteen).filter(Canteen.isOpen == True).all()
-        return [CanteenType(
-            id=canteen.id,
-            name=canteen.name,
-            email=canteen.email,
-            image=canteen.image,
-            location=canteen.location,
-            rating=canteen.rating,
-            openTime=canteen.openTime,
-            closeTime=canteen.closeTime,
-            isOpen=canteen.isOpen,
-            description=canteen.description,
-            phone=canteen.phone,
-            userId=canteen.userId,
-            # schedule=canteen.schedule,
-            tags=canteen.tags
-        ) for canteen in canteens]
+        db: Session = info.context["db"]
+        # Avoid referencing GraphQL-facing properties on the model class.
+        # Use the actual DB column `is_open` when available, otherwise
+        # fall back to checking for a class attribute named `isOpen`.
+        if hasattr(Canteen, "is_open"):
+            canteens = db.query(Canteen).filter(getattr(Canteen, "is_open") == True).all()
+        elif hasattr(Canteen, "isOpen"):
+            canteens = db.query(Canteen).filter(getattr(Canteen, "isOpen") == True).all()
+        else:
+            # As a last resort, return all canteens and let the converter
+            # mark them open/closed based on instance attributes.
+            canteens = db.query(Canteen).all()
+
+        return [convert_canteen_model_to_type(canteen) for canteen in canteens]
 
     @strawberry.field
-    def search_canteens(self, query: str) -> List[CanteenType]:
+    def search_canteens(self, query: str, info: Info) -> List[CanteenType]:
         """Search canteens by name or location"""
-        db = next(get_db())
+        db: Session = info.context["db"]
         canteens = db.query(Canteen).filter(
             (Canteen.name.ilike(f"%{query}%")) |
             (Canteen.location.ilike(f"%{query}%"))
         ).all()
-        return [CanteenType(
-            id=canteen.id,
-            name=canteen.name,
-            email=canteen.email,
-            image=canteen.image,
-            location=canteen.location,
-            rating=canteen.rating,
-            openTime=canteen.openTime,
-            closeTime=canteen.closeTime,
-            isOpen=canteen.isOpen,
-            description=canteen.description,
-            phone=canteen.phone,
-            userId=canteen.userId,
-            # schedule=canteen.schedule,
-            tags=canteen.tags
-        ) for canteen in canteens]
-
-queries = [
-    strawberry.field(name="getAllCanteens", resolver=CanteenQuery.get_all_canteens),
-    strawberry.field(name="getCanteenById", resolver=CanteenQuery.get_canteen_by_id),
-    strawberry.field(name="getOpenCanteens", resolver=CanteenQuery.get_open_canteens),
-    strawberry.field(name="searchCanteens", resolver=CanteenQuery.search_canteens),
-]
+        return [convert_canteen_model_to_type(canteen) for canteen in canteens]

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import VendorLayout from "@/components/layout/VendorLayout";
-import { canteens } from "@/data/mockData";
+// remove mockData import; fetch canteens via GraphQL
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -24,10 +24,12 @@ import {
   User,
 } from "lucide-react";
 import { useApolloClient, useMutation, useQuery } from "@apollo/client";
+import { GET_CANTEENS } from '@/gql/queries/canteens';
 import { GET_CANTEEN_ORDERS } from "@/gql/queries/orders";
 import { UPDATE_ORDER_STATUS } from "@/gql/mutations/orders";
 import { GET_MENU_ITEMS_BY_CANTEEN } from "@/gql/queries/menuItems";
 import { useUserStore } from "@/stores/userStore";
+import { formatIST } from "@/lib/ist";
 
 interface MenuItem {
   id: number | string;
@@ -94,6 +96,10 @@ const VendorOrders = () => {
     fetchPolicy: 'network-only',
   });
 
+  // Get all canteens for selection
+  const { data: canteenData } = useQuery(GET_CANTEENS, { fetchPolicy: 'cache-first' });
+  const allCanteens = canteenData?.getAllCanteens || [];
+
   // Update order status mutation
   const [updateOrderStatus, { loading: updatingStatus }] = useMutation(UPDATE_ORDER_STATUS);
 
@@ -146,51 +152,65 @@ const VendorOrders = () => {
 
   // Handle order status update
   const handleUpdateOrderStatus = async (orderId: number, newStatus: string) => {
+    // Optimistic update: update local state immediately
+    const prevOrders = orders;
+    setOrders((cur) => cur.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)));
+
     try {
       const { data } = await updateOrderStatus({
         variables: {
           orderId,
           status: newStatus,
-          currentUserId
-        }
+          currentUserId,
+        },
       });
 
       if (data?.updateOrderStatus?.success) {
-        // Show notification
         addNotification({
-          title: "Order Status Updated",
+          title: 'Order Status Updated',
           description: `Order #${orderId} has been marked as ${newStatus}`,
-          type: "success",
+          type: 'success',
         });
 
-        // Refetch orders to update the list
+        // refresh to get server canonical timestamps
         refetchOrders();
       } else {
+        // revert optimistic update
+        setOrders(prevOrders);
         addNotification({
-          title: "Error",
-          description: data?.updateOrderStatus?.message || "Failed to update order status",
-          type: "error",
+          title: 'Error',
+          description: data?.updateOrderStatus?.message || 'Failed to update order status',
+          type: 'error',
         });
       }
     } catch (error) {
-      console.error("Error updating order status:", error);
+      // revert optimistic update
+      setOrders(prevOrders);
+      console.error('Error updating order status:', error);
       addNotification({
-        title: "Error",
-        description: "An error occurred while updating the order status",
-        type: "error",
+        title: 'Error',
+        description: 'An error occurred while updating the order status',
+        type: 'error',
       });
     }
   };
 
-  // Format date function
+  // Poll for new orders periodically to keep vendor view fresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        refetchOrders();
+      } catch (e) {
+        // ignore polling errors
+      }
+    }, 10000); // every 10s
+
+    return () => clearInterval(interval);
+  }, [refetchOrders]);
+
+  // Format date function (IST)
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+    return formatIST(dateString, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   // Function to find a menu item by its id
@@ -235,7 +255,7 @@ const VendorOrders = () => {
                 <SelectValue placeholder="Select Canteen" />
               </SelectTrigger>
               <SelectContent>
-                {canteens.map((canteen) => (
+                {allCanteens.map((canteen) => (
                   <SelectItem key={canteen.id} value={canteen.id.toString()}>
                     {canteen.name}
                   </SelectItem>

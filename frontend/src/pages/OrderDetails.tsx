@@ -1,8 +1,12 @@
 
 import React, { useState } from 'react';
+import { formatIST } from '@/lib/ist';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
-import { orders, menuItems, canteens } from '@/data/mockData';
+import { useQuery } from '@apollo/client';
+import { GET_ORDER_BY_ID } from '@/gql/queries/orders';
+import { GET_MENU_ITEMS } from '@/gql/queries/menuItems';
+import { GET_CANTEEN_BY_ID } from '@/gql/queries/canteens';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -39,7 +43,21 @@ const OrderDetails = () => {
   
   // Find the order by id - convert string ID to number
   const numericId = id ? parseInt(id, 10) : 0;
-  const order = orders.find(o => o.id === numericId);
+  const { data: orderData, loading: orderLoading } = useQuery(GET_ORDER_BY_ID, {
+    variables: { orderId: numericId },
+    skip: !numericId,
+  });
+  const order = orderData?.getOrderById;
+
+  // Fetch all menu items once and index by id for lookup
+  const { data: menuData } = useQuery(GET_MENU_ITEMS);
+  const fetchedMenuItems = menuData?.getMenuItems || [];
+  // Fetch canteen info (hook must run on every render to preserve hooks order)
+  const { data: canteenQuery } = useQuery(GET_CANTEEN_BY_ID, {
+    variables: { id: order?.canteenId },
+    skip: !order?.canteenId,
+  });
+  const canteen = canteenQuery?.getCanteenById;
   
   if (!order) {
     return (
@@ -55,32 +73,26 @@ const OrderDetails = () => {
     );
   }
   
-  // Find canteen for this order
-  const canteen = canteens.find(c => c.id === order.canteenId);
+  // Find canteen for this order via GraphQL (canteen data is fetched above)
   
-  // Calculate order totals
-  const subtotal = order.items.reduce((sum, item) => {
-    const menuItem = menuItems.find(m => m.id === item.itemId);
-    return sum + (menuItem ? menuItem.price * item.quantity : 0);
+  // Calculate order totals (prefer server-provided subtotal if present)
+  const subtotal = typeof order.subtotal === 'number' ? order.subtotal : order.items.reduce((sum: number, item: any) => {
+    const menuItem = fetchedMenuItems.find((m: any) => m.id === item.itemId);
+    // Prefer item.price (snapshot) if provided by server, otherwise fall back to menu item price.
+    const unitPrice = (item && (item.price !== undefined && item.price !== null)) ? item.price : (menuItem ? menuItem.price : 0);
+    return sum + (unitPrice * (item.quantity || 0));
   }, 0);
+
+  const tax = typeof order.tax === 'number' ? order.tax : 0;
   
-  // Format date function
+  // Format date function (IST)
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return formatIST(dateString, { day: 'numeric', month: 'short', year: 'numeric' });
   };
-  
-  // Format time function
+
+  // Format time function (IST)
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatIST(dateString, { hour: '2-digit', minute: '2-digit' });
   };
   
   // Handle review submission
@@ -172,18 +184,21 @@ const OrderDetails = () => {
               <div>
                 <h3 className="font-medium mb-4">Order Items</h3>
                 <div className="space-y-4">
-                  {order.items.map((item) => {
-                    const menuItem = menuItems.find(m => m.id === item.itemId);
+                              {order.items.map((item: any) => {
+                    const menuItem = fetchedMenuItems.find((m: any) => m.id === item.itemId);
+                    const itemName = item.name || menuItem?.name || `Item #${item.itemId}`;
+                    const unitPrice = (item && (item.price !== undefined && item.price !== null)) ? item.price : (menuItem ? menuItem.price : 0);
+                    const lineTotal = (unitPrice || 0) * (item.quantity || 0);
                     return (
                       <div key={item.itemId} className="flex justify-between">
                         <div>
                           <div className="flex items-start">
                             <span className="font-medium mr-2">{item.quantity}×</span>
                             <div>
-                              <p>{menuItem?.name || `Item #${item.itemId}`}</p>
+                              <p>{itemName}</p>
                               {item.customizations && item.customizations.length > 0 && (
                                 <div className="text-sm text-gray-500 mt-1">
-                                  {item.customizations.map((customization, index) => (
+                                  {item.customizations.map((customization: any, index: number) => (
                                     <p key={index}>{typeof customization === 'string' ? customization : `Option ${customization}`}</p>
                                   ))}
                                 </div>
@@ -194,9 +209,7 @@ const OrderDetails = () => {
                             </div>
                           </div>
                         </div>
-                        <span className="font-medium">
-                          ₹{menuItem ? (menuItem.price * item.quantity) : 0}
-                        </span>
+                        <span className="font-medium">₹{lineTotal}</span>
                       </div>
                     );
                   })}

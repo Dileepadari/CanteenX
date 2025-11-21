@@ -1,255 +1,229 @@
-import json
 import strawberry
-from typing import Optional, List, Dict
+import json
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.models.cart import Cart, CartItem
-from app.models.menu_item import MenuItem
-from datetime import datetime, timezone
 from strawberry.types import Info
-import jwt
-from app.schemas.common import CustomizationsInput, CustomizationsResponse
+from graphql import GraphQLError
+from datetime import datetime, timezone
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import JSONB
 
-@strawberry.input
-class AddToCartInput:
-    menuItemId: int
-    quantity: int = 1
-    selectedSize: Optional[str] = None
-    selectedExtras: Optional[str] = None
-    specialInstructions: Optional[str] = None
-    location: Optional[str] = None
-    id: Optional[int] = None
-    name: Optional[str] = None
-    price: Optional[float] = None
-    canteenId: Optional[int] = None
-    canteenName: Optional[str] = None
-    customizations: Optional[CustomizationsInput] = None
+from app.core.database import get_db
+from app.models.cart import Cart, CartItem, CartType, AddToCartInput, CustomizationsInput, CartMutationResponse, CartItemType, CustomizationsType
+from app.models.menu_item import MenuItem
+from app.models.user import User
+
+# This helper function is central to getting or creating a user's cart.
+def _get_or_create_user_cart(db: Session, user_id: str):
+    """Finds a user's cart or creates one if it doesn't exist."""
+    cart = db.query(Cart).filter(Cart.user_id == user_id).first()
+    if not cart:
+        now = datetime.now(timezone.utc)
+        cart = Cart(user_id=user_id, created_at=now, updated_at=now)
+        db.add(cart)
+        db.commit()
+        db.refresh(cart)
+    return cart
+
+# This helper normalizes customization data for consistent database storage and comparison.
+def _normalize_customizations(customizations: Optional[CustomizationsInput]) -> Optional[Dict[str, Any]]:
+    """Converts the CustomizationInput into a consistent dictionary for the database."""
+    if not customizations:
+        return None
+    
+    # Use .__dict__ to get all fields from the input object
+    # Filter out unset values to avoid storing nulls for every possible key
+    return {k: v for k, v in customizations.__dict__.items() if v is not strawberry.UNSET}
+
 
 @strawberry.type
-class CartItemResponse:
-    id: int
-    name: str
-    price: float
-    quantity: int
-    canteenId: Optional[int]
-    canteenName: Optional[str]
-    customizations: Optional[CustomizationsResponse] = None
-
-@strawberry.type
-class CartMutationResponse:
-    success: bool
-    message: str
-    cartItem: Optional[CartItemResponse] = None
-
-@strawberry.type
-class CartMutation:
+class CartMutations:
     @strawberry.mutation
     def add_to_cart(self, info: Info, input: AddToCartInput) -> CartMutationResponse:
-        request = info.context["request"]
-        cookies = request.headers.get("cookie", "")
-        auth_header = None
-        for cookie in cookies.split(";"):
-            key, _, value = cookie.strip().partition("=")
-            if key == "accessToken":
-                auth_header = f"Bearer {value}"
-                break
+        """
+        Adds an item to the cart or increases its quantity if an identical item already exists.
+        Returns the entire updated cart on success.
+        """
+        db: Session = info.context["db"]
+        current_user: User = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("You must be logged in to modify the cart.")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return CartMutationResponse(success=False, message="Unauthorized", cartItem=None)
+        # 1. Validate that the menu item exists (Source of Truth)
+        # The input uses camelCase field names coming from the frontend
+        menu_item = db.query(MenuItem).filter(MenuItem.id == input.menuItemId).first()
+        if not menu_item:
+            raise GraphQLError("Menu item not found.")
 
-        token = auth_header.split(" ")[1]
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            userId = payload.get("user_id")
-            if not userId:
-                return CartMutationResponse(success=False, message="Invalid token: user_id missing", cartItem=None)
-        except Exception as e:
-            return CartMutationResponse(success=False, message=f"Invalid token: {str(e)}", cartItem=None)
+        # 2. Get or create the user's cart
+        cart = _get_or_create_user_cart(db, current_user.id)
 
-        db: Session = next(get_db())
+        # 3. Normalize customizations for consistent comparison and storage
+        customizations_dict = _normalize_customizations(input.customizations)
 
-        if not input.menuItemId:
-            return CartMutationResponse(success=False, message="menuItemId is required", cartItem=None)
-
-        selected_size_json = json.loads(input.selectedSize) if input.selectedSize else None
-        selected_extras_json = json.loads(input.selectedExtras) if input.selectedExtras else None
-
-        cart = db.query(Cart).filter(Cart.userId == userId).first()
-        now = datetime.now(timezone.utc)
-        if not cart:
-            cart = Cart(userId=userId, createdAt=now.isoformat(), updatedAt=now.isoformat())
-            db.add(cart)
-            db.commit()
-            db.refresh(cart)
+        # 4. Check if an identical item (same menu item ID and same customizations) already exists
+        # Build a safe comparison for the JSON column. Postgres does not
+        # support the `=` operator for the `json` type in some setups; using
+        # jsonb equality is more robust. If customizations is None we check
+        # for NULL, otherwise cast the column to JSONB and compare.
+        if customizations_dict is None:
+            custom_filter = CartItem.customizations.is_(None)
+        else:
+            custom_filter = func.cast(CartItem.customizations, JSONB) == customizations_dict
 
         existing_item = db.query(CartItem).filter(
-            CartItem.cartId == cart.id,
-            CartItem.menuItemId == input.menuItemId,
-            CartItem.selectedSize == selected_size_json,
-            CartItem.selectedExtras == selected_extras_json,
+            CartItem.cart_id == cart.id,
+            CartItem.menu_item_id == input.menuItemId,
+            custom_filter
         ).first()
-        
-        customizations_dict = None
-        if input.customizations:
-            try:
-                if isinstance(input.customizations, str):
-                    customizations_dict = json.loads(input.customizations)
-                else:
-                    # Create a clean dictionary without __typename
-                    customizations_dict = {}
-                    if hasattr(input.customizations, 'size'):
-                        customizations_dict['size'] = input.customizations.size
-                    if hasattr(input.customizations, 'additions'):
-                        customizations_dict['additions'] = input.customizations.additions
-                    if hasattr(input.customizations, 'removals'):
-                        customizations_dict['removals'] = input.customizations.removals
-                    if hasattr(input.customizations, 'notes'):
-                        customizations_dict['notes'] = input.customizations.notes
-            except Exception:
-                customizations_dict = None
-                
+
         if existing_item:
             existing_item.quantity += input.quantity
-            if customizations_dict:
-                existing_item.customizations = customizations_dict
-            db.commit()
-            db.refresh(existing_item)
+            # ensure we return the updated cart item
             cart_item = existing_item
         else:
             new_cart_item = CartItem(
-                cartId=cart.id,
-                menuItemId=input.menuItemId,
-                name=input.name,
-                canteenId=input.canteenId,
-                canteenName=input.canteenName,
-                price=input.price,
+                cart_id=cart.id,
+                menu_item_id=input.menuItemId,
                 quantity=input.quantity,
-                selectedSize=selected_size_json,
-                selectedExtras=selected_extras_json,
-                specialInstructions=input.specialInstructions,
-                location=input.location,
-                customizations=customizations_dict,
+                customizations=customizations_dict
             )
             db.add(new_cart_item)
-            db.commit()
-            db.refresh(new_cart_item)
+            # capture the newly created item for returning
             cart_item = new_cart_item
 
-        cart.updatedAt = now.isoformat()
+        cart.updated_at = datetime.now(timezone.utc)
         db.commit()
+        # refresh both cart and the single cart item we will return
+        db.refresh(cart)
+        try:
+            db.refresh(cart_item)
+        except Exception:
+            # If refresh fails for any reason, ignore and still return the cart
+            cart_item = None
 
-        menu_item = db.query(MenuItem).filter(MenuItem.id == cart_item.menuItemId).first()
-        if not menu_item:
-            return CartMutationResponse(success=False, message="Menu item not found", cartItem=None)
+        # Build a safe GraphQL-friendly CartItemType to avoid Strawberry trying to access
+        # missing attributes on the SQLAlchemy model (which caused AttributeError for
+        # fields like `name` and `price` in previous responses).
+        cart_item_result = None
+        if cart_item is not None:
+            # Try to get the associated MenuItem to populate human-friendly fields
+            try:
+                menu_item = db.query(MenuItem).filter(MenuItem.id == cart_item.menu_item_id).first()
+            except Exception:
+                menu_item = None
 
-        # Create a proper customizations object instead of a string
-        custom_response = CustomizationsResponse(
-            size=selected_size_json if isinstance(selected_size_json, str) else None,
-            additions=selected_extras_json.get("additions") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
-            removals=selected_extras_json.get("removals") if selected_extras_json and isinstance(selected_extras_json, dict) else None,
-            notes=cart_item.specialInstructions,
-        )
+            # Map DB customizations (JSON/dict) into the GraphQL CustomizationsType
+            cs = getattr(cart_item, 'customizations', None)
+            cs_obj = None
+            if isinstance(cs, dict):
+                # Ensure additions/removals are lists of strings for GraphQL
+                def _coerce_list(values):
+                    if values is None:
+                        return None
+                    out = []
+                    for v in values:
+                        if isinstance(v, dict):
+                            out.append(v.get('name') or v.get('label') or str(v))
+                        else:
+                            out.append(str(v))
+                    return out if out else None
 
-        cart_item_response = CartItemResponse(
-            id=cart_item.id,
-            name=menu_item.name,
-            price=menu_item.price,
-            quantity=cart_item.quantity,
-            canteenId=menu_item.canteenId,
-            canteenName=menu_item.canteenName,
-            customizations=custom_response,
-        )
+                cs_obj = CustomizationsType(
+                    size=cs.get('size'),
+                    additions=_coerce_list(cs.get('additions')),
+                    removals=_coerce_list(cs.get('removals')),
+                    notes=(cs.get('notes') if not isinstance(cs.get('notes'), dict) else json.dumps(cs.get('notes'))),
+                )
 
-        return CartMutationResponse(success=True, message="Item added to cart", cartItem=cart_item_response)
+            cart_item_result = CartItemType(
+                id=cart_item.id,
+                menuItemId=int(cart_item.menu_item_id) if getattr(cart_item, 'menu_item_id', None) is not None else None,
+                quantity=int(getattr(cart_item, 'quantity', 0)),
+                name=menu_item.name if menu_item else None,
+                price=float(menu_item.price) if menu_item and getattr(menu_item, 'price', None) is not None else None,
+                canteenId=menu_item.canteenId if menu_item else None,
+                canteenName=menu_item.canteenName if menu_item else None,
+                cartId=int(cart.id) if cart is not None else None,
+                customizations=cs_obj,
+            )
+
+        return CartMutationResponse(success=True, message="Item added to cart.", cart=cart, cartItem=cart_item_result)
 
     @strawberry.mutation
-    def update_cart_item(
-        self,
-        userId: str,
-        cartItemId: int,
-        quantity: Optional[int] = None,
-        selectedSize: Optional[str] = None,
-        selectedExtras: Optional[str] = None,
-        specialInstructions: Optional[str] = None,
-        location: Optional[str] = None,
-        price: Optional[float] = None,
-    ) -> CartMutationResponse:
-        db: Session = next(get_db())
-        cart_item = db.query(CartItem).filter(CartItem.id == cartItemId).first()
+    def update_cart_item_quantity(self, info: Info, cart_item_id: int, quantity: int) -> CartMutationResponse:
+        """
+        Updates the quantity of a specific item in the user's cart.
+        If quantity is 0 or less, the item is removed.
+        """
+        db: Session = info.context["db"]
+        current_user: User = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("You must be logged in to modify the cart.")
+
+        # Securely fetch the cart item by joining with the Cart and filtering by the current user's ID
+        cart_item = db.query(CartItem).join(Cart).filter(
+            CartItem.id == cart_item_id,
+            Cart.user_id == current_user.id
+        ).first()
 
         if not cart_item:
-            return CartMutationResponse(success=False, message="Cart item not found")
-            
-        # Verify that the cart item belongs to the user
-        cart = db.query(Cart).filter(Cart.id == cart_item.cartId).first()
-        if not cart or cart.userId != userId:
-            return CartMutationResponse(success=False, message="Cart item does not belong to this user")
-
-        if quantity is not None:
+            raise GraphQLError("Cart item not found or you do not have permission to modify it.")
+        
+        cart = cart_item.cart
+        if quantity <= 0:
+            db.delete(cart_item)
+        else:
             cart_item.quantity = quantity
-        if selectedSize is not None:
-            cart_item.selectedSize = json.loads(selectedSize)
-        if selectedExtras is not None:
-            cart_item.selectedExtras = json.loads(selectedExtras)
-        if specialInstructions is not None:
-            cart_item.specialInstructions = specialInstructions
-        if location is not None:
-            cart_item.location = location
-        if price is not None:
-            cart_item.price = price
-
-        if cart:
-            cart.updatedAt = datetime.now(timezone.utc).isoformat()
+        
+        cart.updated_at = datetime.now(timezone.utc)
         db.commit()
-        return CartMutationResponse(success=True, message="Cart item updated")
+        db.refresh(cart)
+        
+        return CartMutationResponse(success=True, message="Cart item updated.", cart=cart)
 
     @strawberry.mutation
-    def remove_from_cart(
-        self,
-        userId: str,
-        cartItemId: int,
-    ) -> CartMutationResponse:
-        db: Session = next(get_db())
-        cart_item = db.query(CartItem).filter(CartItem.id == cartItemId).first()
+    def remove_from_cart(self, info: Info, cart_item_id: int) -> CartMutationResponse:
+        """Removes an item completely from the authenticated user's cart."""
+        db: Session = info.context["db"]
+        current_user: User = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("You must be logged in to modify the cart.")
+            
+        # Securely fetch the item to ensure it belongs to the current user
+        cart_item = db.query(CartItem).join(Cart).filter(
+            CartItem.id == cart_item_id,
+            Cart.user_id == current_user.id
+        ).first()
 
         if not cart_item:
-            return CartMutationResponse(success=False, message="Cart item not found")
-
-        cart = db.query(Cart).filter(Cart.id == cart_item.cartId).first()
-        if not cart or cart.userId != userId:
-            return CartMutationResponse(success=False, message="Cart item does not belong to this user")
-
+            raise strawberry.GraphQLError("Cart item not found or you do not have permission to modify it.")
+            
+        cart = cart_item.cart
         db.delete(cart_item)
-        cart.updatedAt = datetime.now(timezone.utc).isoformat()
+        cart.updated_at = datetime.now(timezone.utc)
         db.commit()
+        db.refresh(cart)
 
-        return CartMutationResponse(success=True, message="Item removed from cart")
+        return CartMutationResponse(success=True, message="Item removed from cart.", cart=cart)
 
     @strawberry.mutation
-    def clear_cart(self, userId: str) -> CartMutationResponse:
-        db: Session = next(get_db())
-        cart = db.query(Cart).filter(Cart.userId == userId).first()
+    def clear_cart(self, info: Info) -> CartMutationResponse:
+        """Removes all items from the authenticated user's cart."""
+        db: Session = info.context["db"]
+        current_user: User = info.context.get("user")
+        if not current_user:
+            raise GraphQLError("You must be logged in to modify the cart.")
 
-        if not cart:
-            return CartMutationResponse(success=False, message="Cart not found")
+        cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
+        if cart and cart.items:
+            # Efficiently delete all items associated with the cart
+            db.query(CartItem).filter(CartItem.cart_id == cart.id).delete(synchronize_session=False)
+            cart.updated_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(cart)
+        elif not cart:
+            # If the user has no cart, create an empty one for a consistent response
+            cart = _get_or_create_user_cart(db, current_user.id)
 
-        db.query(CartItem).filter(CartItem.cartId == cart.id).delete()
-        cart.updatedAt = datetime.now(timezone.utc).isoformat()
-        db.commit()
-
-        return CartMutationResponse(success=True, message="Cart cleared successfully")
-
-# Register mutations individually if needed
-mutations = [
-    strawberry.field(name="addToCart", resolver=CartMutation.add_to_cart),
-    strawberry.field(name="updateCartItem", resolver=CartMutation.update_cart_item),
-    strawberry.field(name="removeFromCart", resolver=CartMutation.remove_from_cart),
-    strawberry.field(name="clearCart", resolver=CartMutation.clear_cart),
-]
-
-@strawberry.type
-class Mutation:
-    add_to_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.add_to_cart)
-    update_cart_item: CartMutationResponse = strawberry.field(resolver=CartMutation.update_cart_item)
-    remove_from_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.remove_from_cart)
-    clear_cart: CartMutationResponse = strawberry.field(resolver=CartMutation.clear_cart)
+        return CartMutationResponse(success=True, message="Cart cleared successfully.", cart=cart)
