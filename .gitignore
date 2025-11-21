@@ -12,3 +12,4 @@ coverage/
 *.iml
 .idea/
 *.pyc
+backend/.venv/

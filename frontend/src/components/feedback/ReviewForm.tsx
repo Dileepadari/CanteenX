@@ -97,14 +97,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                   <Star
                     className={`h-8 w-8 ${
                       star <= (hoverRating || rating)
-                        ? "text-yellow-400 fill-yellow-400"
-                        : "text-gray-300"
+                        ? "text-primary fill-primary"
+                        : "text-muted-foreground"
                     } transition-colors`}
                   />
                 </button>
               ))}
             </div>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {rating === 1
                 ? "Poor"
                 : rating === 2

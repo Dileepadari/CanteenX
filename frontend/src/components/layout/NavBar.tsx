@@ -1,6 +1,5 @@
-
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,45 +19,49 @@ import { ShoppingCart } from "@/components/cart/ShoppingCart";
 import { useNotification } from "@/contexts/NotificationContext";
 import UserNotifications from "../notification/UserNotifications";
 import VendorNotifications from "../notification/VendorNotifications";
+import { useUserStore } from "@/stores/userStore";
 
 const NavBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { items } = useCart();
   const { unreadCount } = useNotification();
   const location = useLocation();
-  
-  // Check if current path is a vendor path
-  const isVendorRoute = location.pathname.startsWith('/vendor');
+  const navigate = useNavigate();
+  const { user, logout } = useUserStore();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  const roleLower = user?.role?.toLowerCase?.() || '';
+  const isVendor = roleLower === 'vendor';
+  const isAdmin = roleLower === 'admin' || roleLower === 'administrator';
 
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-sm bg-white/90 border-b">
+    <header className="sticky top-0 z-50 w-full backdrop-blur-sm bg-background/90 border-b border-border">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
         <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="text-2xl font-bold text-canteen-orange">Smart</span>
-              <span className="text-2xl font-bold text-canteen-blue">Canteen</span>
-            </Link>
-          </div>
+          <Link to="/" className="flex items-center space-x-2">
+            <span className="text-2xl font-bold text-primary">Smart</span>
+            <span className="text-2xl font-bold text-secondary">Canteen</span>
+          </Link>
+        </div>
 
-        {/* Desktop Navigation */}
         <nav className="hidden md:flex md:items-center md:space-x-4 lg:space-x-6">
-          <NavLinks isVendor={isVendorRoute} />
+          <NavLinks role={user?.role} isVendor={isVendor} />
         </nav>
 
-        {/* Action Buttons */}
         <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          {isVendorRoute ? <VendorNotifications /> : <UserNotifications />}
+          {isVendor ? <VendorNotifications /> : <UserNotifications />}
 
-          {/* Cart (Only show on user routes) */}
-          {!isVendorRoute && (
-            <Link to="/menu">
+          {!isVendor && (
+            <Link to="/cart">
               <Button variant="outline" size="icon" className="relative">
-                <ShoppingCart  />
+                <ShoppingCart />
                 {items.length > 0 && (
-                  <Badge 
-                    className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center p-0 bg-orange-500"
+                  <Badge
+                    className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center p-0 bg-primary text-primary-foreground"
                     variant="default"
                   >
                     {items.length}
@@ -68,42 +71,50 @@ const NavBar = () => {
             </Link>
           )}
 
-          {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Avatar className="cursor-pointer">
-                <AvatarImage src="/placeholder.svg" />
-                <AvatarFallback>
-                  <User className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to="/profile" className="cursor-pointer w-full">Profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/orders" className="cursor-pointer w-full">Orders</Link>
-              </DropdownMenuItem>
-              {isVendorRoute ? (
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="cursor-pointer">
+                  <AvatarImage src={(user as any)?.profilePicture || "/placeholder.svg"} />
+                  <AvatarFallback>
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to="/" className="cursor-pointer w-full">Switch to User</Link>
+                  <Link to="/profile" className="cursor-pointer w-full">Profile</Link>
                 </DropdownMenuItem>
-              ) : (
                 <DropdownMenuItem asChild>
-                  <Link to="/vendor/dashboard" className="cursor-pointer w-full">Switch to Vendor</Link>
+                  <Link to="/orders" className="cursor-pointer w-full">Orders</Link>
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 cursor-pointer" >
-                <LogOut className="h-4 w-4 mr-2" /> <Link to="/logout">LogOut</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {isVendor ? (
+                  <DropdownMenuItem asChild>
+                    <Link to="/" className="cursor-pointer w-full">Switch to User</Link>
+                  </DropdownMenuItem>
+                ) : isAdmin ? (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin/dashboard" className="cursor-pointer w-full">Admin Dashboard</Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem asChild>
+                    <Link to="/vendor/dashboard" className="cursor-pointer w-full">Switch to Vendor</Link>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive cursor-pointer" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" /> Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild>
+              <Link to="/login">Login</Link>
+            </Button>
+          )}
 
-          {/* Mobile Menu */}
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="md:hidden">
@@ -112,18 +123,18 @@ const NavBar = () => {
             </SheetTrigger>
             <SheetContent side="right">
               <div className="py-4">
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   className="flex items-center space-x-2 mb-6"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <img src="/placeholder.svg" alt="Logo" className="w-8 h-8" />
-                  <span className="text-lg font-semibold">Smart Canteen</span>
+                  <span className="text-lg font-semibold">CanteenX</span>
                 </Link>
                 <nav className="flex flex-col space-y-4">
-                  <NavLinks 
-                    isVendor={isVendorRoute} 
-                    isMobile 
+                  <NavLinks
+                    role={user?.role}
+                    isVendor={isVendor}
+                    isMobile
                     onItemClick={() => setIsMenuOpen(false)}
                   />
                 </nav>

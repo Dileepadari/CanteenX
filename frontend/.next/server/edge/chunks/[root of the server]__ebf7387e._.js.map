@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 23, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/src/middleware.js"],"sourcesContent":["import Cookies from \"js-cookie\";\nimport { useEffect } from \"react\";\nimport { useLocation, useNavigate } from \"react-router-dom\";\n\nconst useAuthMiddleware = () => {\n  const location = useLocation();\n  const navigate = useNavigate();\n\n  useEffect(() => {\n    const token = Cookies.get(\"accessToken\");\n    const publicPaths = [\"/login\"];\n    const pathIsPublic = publicPaths.includes(location.pathname);\n\n    if (!token && !pathIsPublic) {\n      navigate(\"/login\");\n    }\n  }, [location, navigate]);\n\n  return null;\n};\n\nexport default useAuthMiddleware;\n"],"names":[],"mappings":";;;;;;;;AACA;;;;;;;;;AAGA,MAAM,oBAAoB;IACxB,MAAM,WAAW;IACjB,MAAM,WAAW;IAEjB,CAAA,GAAA,qLAAA,CAAA,YAAS,AAAD,EAAE;QACR,MAAM,QAAQ,QAAQ,GAAG,CAAC;QAC1B,MAAM,cAAc;YAAC;SAAS;QAC9B,MAAM,eAAe,YAAY,QAAQ,CAAC,SAAS,QAAQ;QAE3D,IAAI,CAAC,SAAS,CAAC,cAAc;YAC3B,SAAS;QACX;IACF,GAAG;QAAC;QAAU;KAAS;IAEvB,OAAO;AACT;uCAEe"}}]
+}

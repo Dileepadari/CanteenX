@@ -11,18 +11,78 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import MenuItemWithCustomization from "@/components/food/MenuItemWithCustomization";
-import { canteens as mockCanteens, menuItems as mockFoodItems, categories as foodCategories } from "@/data/mockData";
+import { useApolloClient } from "@apollo/client"; // Import Apollo Client
+import { GET_MENU_ITEMS } from "@/gql/queries/menuItems"; // Added import for th
+import { GET_CANTEENS } from "@/gql/queries/canteens"; // Added import for the query
+// import { Console } from "console"; // Removed unused Console import
+
 
 const Menu = () => {
+  const [mockFoodItems, setMenuItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState(mockFoodItems);
+  const [mockCanteens, setCanteens] = useState([]);
   const [selectedCanteen, setSelectedCanteen] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortOption, setSortOption] = useState<string>("popularity");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+  const client = useApolloClient(); // Get Apollo Client instance
+  
+    useEffect(() => {
+      const fetchCanteens = async () => {
+        try {
+          setLoading(true);
+          const { data } = await client.query({ query: GET_CANTEENS });
+          setCanteens(data?.getAllCanteens || []);
+        } catch (err) {
+          setError(err);
+          toast({
+            title: "Error",
+            description: "Failed to fetch canteens.",
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchCanteens();
+    }, [client, toast]);
+  
+  
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_MENU_ITEMS });
+        setMenuItems(data?.getMenuItems || []);
+        setFilteredItems(data?.getMenuItems || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch menu items.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenuItems();
+  }, [client, toast]);
 
   const navigate = useNavigate();
+
+  // derive unique categories from fetched menu items
+  const derivedCategories = Array.from(
+    new Map(
+      mockFoodItems
+        .map((m: any, idx: number) => ({ id: idx + 1, name: m.category || "Uncategorized", icon: "coffee" }))
+        .map((c) => [c.name, c])
+    ).values()
+  );
 
   // Apply filters when dependencies change
   useEffect(() => {
@@ -30,7 +90,8 @@ const Menu = () => {
 
     // Filter by canteen
     if (selectedCanteen !== "all") {
-      result = result.filter((item) => item.canteenId === selectedCanteen);
+      // canteenId from backend might be string or number, compare as string
+      result = result.filter((item) => String(item.canteenId) === String(selectedCanteen));
     }
 
     // Filter by category
@@ -95,25 +156,25 @@ const Menu = () => {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white">
+      <div className="min-h-screen">
         <div className="container px-4 py-8 mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-            <h1 className="text-3xl font-bold text-orange-600">Menu</h1>
+            <h1 className="text-3xl font-bold text-primary">Menu</h1>
 
             <div className="flex items-center gap-2">
               <div className="relative flex-grow max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                 <Input
                   placeholder="Search for food..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 border-orange-200 focus:border-orange-300"
+                  className="pl-10 border-border focus:border-primary"
                 />
               </div>
 
               <Button
                 onClick={() => navigate("/cart")}
-                className="bg-orange-500 hover:bg-orange-600"
+                className="bg-primary text-primary-foreground hover:bg-primary/95"
               >
                 <ShoppingCart className="w-5 h-5" />
               </Button>
@@ -121,12 +182,12 @@ const Menu = () => {
           </div>
 
           {/* Filters Section */}
-          <div className="bg-white rounded-lg p-4 mb-6 border border-orange-100 shadow-sm">
+          <div className="bg-card rounded-lg p-4 mb-6 border border-border shadow-sm">
             <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
               <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-sm font-medium text-gray-600">Canteen:</span>
+                <span className="text-sm font-medium text-muted-foreground">Canteen:</span>
                 <Select value={selectedCanteen} onValueChange={setSelectedCanteen}>
-                  <SelectTrigger className="w-[180px] h-9 border-orange-200">
+                  <SelectTrigger className="w-[180px] h-9 border-border">
                     <SelectValue placeholder="All Canteens" />
                   </SelectTrigger>
                   <SelectContent>
@@ -139,32 +200,33 @@ const Menu = () => {
                   </SelectContent>
                 </Select>
 
-                <span className="text-sm font-medium text-gray-600 ml-2">Category:</span>
+                <span className="text-sm font-medium text-muted-foreground ml-2">Category:</span>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-[180px] h-9 border-orange-200">
+                  <SelectTrigger className="w-[180px] h-9 border-border">
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    {foodCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="All">All Categories</SelectItem>
+                    {derivedCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 border-orange-200">
-                      <Filter className="w-4 h-4 mr-2" />
-                      Tags
-                      {selectedTags.length > 0 && (
-                        <Badge className="ml-2 bg-orange-100 text-orange-700 hover:bg-orange-200" variant="secondary">
-                          {selectedTags.length}
-                        </Badge>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
+                      <Button variant="outline" size="sm" className="h-9 border-border">
+                        <Filter className="w-4 h-4 mr-2" />
+                        Tags
+                        {selectedTags.length > 0 && (
+                          <Badge className="ml-2 bg-muted text-muted-foreground" variant="secondary">
+                            {selectedTags.length}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
                   <PopoverContent className="w-[200px] p-2">
                     <div className="space-y-2">
                       {["Vegetarian", "Non-Vegetarian", "Healthy", "Quick Bite", "Premium", "South Indian"].map((tag) => (
@@ -176,7 +238,7 @@ const Menu = () => {
                               if (checked) handleTagToggle(tag);
                               else handleTagToggle(tag);
                             }}
-                            className="border-orange-300 text-orange-500"
+                            className="border-border text-primary"
                           />
                           <label htmlFor={`tag-${tag}`} className="text-sm cursor-pointer">
                             {tag}
@@ -190,11 +252,11 @@ const Menu = () => {
 
               <div className="flex gap-2 items-center flex-wrap">
                 <div className="flex items-center">
-                  <SlidersHorizontal className="w-4 h-4 mr-2 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-600">Sort by:</span>
+                  <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Sort by:</span>
                 </div>
                 <Select value={sortOption} onValueChange={setSortOption}>
-                  <SelectTrigger className="w-[150px] h-9 border-orange-200">
+                    <SelectTrigger className="w-[150px] h-9 border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -215,7 +277,7 @@ const Menu = () => {
                     variant="ghost"
                     size="sm"
                     onClick={clearFilters}
-                    className="h-9 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                    className="h-9 text-primary hover:text-primary/90 hover:bg-muted"
                   >
                     Clear Filters
                   </Button>
@@ -227,8 +289,8 @@ const Menu = () => {
           {/* Results */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="w-12 h-12 animate-spin text-orange-500 mb-4" />
-              <p className="text-lg text-gray-600">Loading menu...</p>
+              <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+              <p className="text-lg text-muted-foreground">Loading menu...</p>
             </div>
           ) : filteredItems.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 animate-fade-in">
@@ -238,14 +300,14 @@ const Menu = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
-              <div className="p-8 mb-6 text-8xl bg-orange-100 rounded-full">
-                <Search className="w-16 h-16 text-orange-500" />
+              <div className="p-8 mb-6 text-8xl bg-muted rounded-full">
+                <Search className="w-16 h-16 text-primary" />
               </div>
               <h2 className="text-2xl font-semibold mb-2">No items found</h2>
-              <p className="text-gray-600 mb-6 text-center max-w-md">
+              <p className="text-muted-foreground mb-6 text-center max-w-md">
                 We couldn't find any food items matching your criteria. Try adjusting your filters or search term.
               </p>
-              <Button onClick={clearFilters} className="bg-orange-500 hover:bg-orange-600">
+              <Button onClick={clearFilters} className="bg-primary text-primary-foreground hover:bg-primary/95">
                 Clear All Filters
               </Button>
             </div>

@@ -18,20 +18,28 @@ import {
 } from 'lucide-react';
 
 interface NavLinksProps {
+  role?: string;
   isVendor?: boolean;
   isMobile?: boolean;
   onItemClick?: () => void;
 }
 
-const NavLinks: React.FC<NavLinksProps> = ({ isVendor = false, isMobile = false, onItemClick = () => {} }) => {
-  const linkClasses = "flex items-center py-2 px-4 text-gray-700 hover:bg-orange-100 rounded-md transition-colors";
-  const activeLinkClasses = "bg-orange-100 text-orange-600 font-medium";
+const NavLinks: React.FC<NavLinksProps> = ({ role, isVendor = false, isMobile = false, onItemClick = () => {} }) => {
+  const linkClasses = "flex items-center py-2 px-4 text-gray-700 hover:bg-muted rounded-md transition-colors";
+  const activeLinkClasses = "bg-muted text-primary font-medium";
   const iconClasses = "h-5 w-5 mr-3";
   
   const userLinks = [
     { path: "/", label: "Home", icon: <Home className={iconClasses} /> },
     { path: "/canteens", label: "Canteens", icon: <Store className={iconClasses} /> },
     { path: "/menu", label: "Menu", icon: <MenuSquare className={iconClasses} /> },
+  ];
+
+  const adminLinks = [
+    { path: "/admin/dashboard", label: "Admin", icon: <LayoutDashboard className={iconClasses} /> },
+    { path: "/admin/canteens", label: "Canteens", icon: <Store className={iconClasses} /> },
+    { path: "/admin/vendors", label: "Vendors", icon: <User className={iconClasses} /> },
+    { path: "/admin/complaints", label: "Complaints", icon: <ClipboardList className={iconClasses} /> },
   ];
 
   const vendorLinks = [
@@ -44,7 +52,13 @@ const NavLinks: React.FC<NavLinksProps> = ({ isVendor = false, isMobile = false,
     { path: "/vendor/settings", label: "Settings", icon: <Settings className={iconClasses} /> },
   ];
 
-  const links = isVendor ? vendorLinks : userLinks;
+  const roleLower = role?.toLowerCase?.() || '';
+  const resolvedIsVendor = isVendor || roleLower === 'vendor';
+  const resolvedIsAdmin = roleLower === 'admin' || roleLower === 'administrator';
+
+  let links = userLinks;
+  if (resolvedIsAdmin) links = adminLinks;
+  else if (resolvedIsVendor) links = vendorLinks;
 
   return (
     // display flex

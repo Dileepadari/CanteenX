@@ -10,27 +10,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Search, Plus, Edit, Trash2, ArrowUpDown, AlertTriangle, MenuSquare, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { menuItems, categories } from '@/data/mockData';
+import { useUserStore } from '@/stores/userStore';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import inventory from '@/lib/inventory';
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
+import type { MenuItem as MenuItemModel } from '@/types/models';
 
-// Add necessary properties to menu items
-interface EnhancedMenuItem {
-  id: string | number;
-  canteenId: string | number;
-  canteenName: string;
+// UI-augmented item (adds client-side only fields)
+type UIItem = MenuItemModel & { stockCount?: number; orderCount?: number };
+import { GET_MENU_ITEMS_BY_CANTEEN } from '@/gql/queries/menuItems';
+import { CREATE_MENU_ITEM, UPDATE_MENU_ITEM, DELETE_MENU_ITEM } from '@/gql/mutations/menuitems';
+import { SET_MENU_ITEM_STOCK } from '@/gql/mutations/menuitems';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+
+// Interface for menu item
+// Local form type
+interface NewMenuItem {
   name: string;
-  description: string;
   price: number;
+  description: string;
   category: string;
   image: string;
   tags: string[];
-  rating: number;
-  ratingCount: number;
-  isAvailable: boolean;
-  preparationTime: number;
   isPopular: boolean;
-  customizationOptions: any;
-  stockCount?: number;
-  orderCount?: number;
+  preparationTime: number;
 }
 
 const VendorMenu = () => {
@@ -38,22 +43,139 @@ const VendorMenu = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name-asc');
   const [isAvailableOnly, setIsAvailableOnly] = useState(false);
+  const [isAddMenuItemOpen, setIsAddMenuItemOpen] = useState(false);
+  const [isEditMenuItemOpen, setIsEditMenuItemOpen] = useState(false);
+  const [currentMenuItem, setCurrentMenuItem] = useState<UIItem | null>(null);
   
-  // Enhancement: add stock count and order count to menu items for better inventory management
-  const [enhancedMenuItems, setEnhancedMenuItems] = useState<EnhancedMenuItem[]>([]);
+  // New menu item form state
+  const [newMenuItem, setNewMenuItem] = useState<NewMenuItem>({
+    name: '',
+    price: 0,
+    description: '',
+    category: 'main',
+    image: 'https://placehold.co/600x400',
+    tags: [],
+    isPopular: false,
+    preparationTime: 15,
+  });
+  
+  // Get user from store
+  const { user } = useUserStore();
+  const currentUserId = user?.id || '';
+  
+  // Default canteen ID (should be fetched from user context in a real app)
+  const [selectedCanteenId, setSelectedCanteenId] = useState<number>(1);
+  const [selectedCanteenName, setSelectedCanteenName] = useState<string>('Main Canteen');
+  
+  // Apollo client
+  const client = useApolloClient();
+  
+  // Query menu items
+  const { loading, error, data, refetch } = useQuery(GET_MENU_ITEMS_BY_CANTEEN, {
+    variables: { canteenId: selectedCanteenId },
+    fetchPolicy: 'network-only',
+  });
+  
+  // Mutations
+  const [createMenuItem] = useMutation(CREATE_MENU_ITEM);
+  const [updateMenuItem] = useMutation(UPDATE_MENU_ITEM);
+  const [deleteMenuItem] = useMutation(DELETE_MENU_ITEM);
+  
+  // Enhance menu items with stock count (this would come from the backend in a real application)
+  const [enhancedMenuItems, setEnhancedMenuItems] = useState<UIItem[]>([]);
 
-  // Initialize enhancedMenuItems with mock data
+  // derive categories from enhancedMenuItems (unique)
+  const derivedCategories = Array.from(
+    new Map(
+      enhancedMenuItems
+        .map((m: any, idx: number) => ({ id: idx + 1, name: m.category || 'main' }))
+        .map((c) => [c.name, c])
+    ).values()
+  );
+  
+  // Initialize enhancedMenuItems with data from GraphQL
   useEffect(() => {
-    const initialItems = menuItems.map(item => ({
-      ...item,
-      id: String(item.id),  // Ensure id is string
-      canteenId: String(item.canteenId), // Ensure canteenId is string
-      stockCount: Math.floor(Math.random() * 100),
-      orderCount: Math.floor(Math.random() * 1000)
-    }));
-    setEnhancedMenuItems(initialItems);
-  }, []);
+    if (data?.getMenuItemsByCanteen) {
+      const items = data.getMenuItemsByCanteen.map((item: any) => ({
+        ...item,
+        id: item.id,
+        canteenId: item.canteenId,
+        // Prefer server-provided stockCount. If absent, fall back to local inventory store. Default to 0.
+        stockCount: item.stockCount ?? inventory.getStock(item.id) ?? 0,
+        // orderCount is not currently provided by the server; show 0 until server provides metrics.
+        orderCount: 0,
+      }));
+      setEnhancedMenuItems(items);
+    }
+  }, [data]);
 
+  const [setMenuItemStock] = useMutation(SET_MENU_ITEM_STOCK);
+
+  // Update stock count locally and persist server-side; fall back to client-only if server fails.
+  const updateStockCount = async (id: string | number, count: number) => {
+    // Optimistic UI update
+    setEnhancedMenuItems(prev => prev.map(item => String(item.id) === String(id) ? { ...item, stockCount: count } : item));
+
+    try {
+      const { data: res } = await setMenuItemStock({ variables: { itemId: parseInt(String(id)), stockCount: count } });
+      if (res?.setMenuItemStock?.stockCount !== undefined) {
+        // Persist locally as well
+        try { inventory.setStock(id, res.setMenuItemStock.stockCount); } catch (e) { console.error(e); }
+        toast.success('Stock updated');
+      } else {
+        // If server didn't return expected value, fallback
+        try { inventory.setStock(id, count); } catch (e) { console.error(e); }
+        toast.error('Server did not confirm stock update — saved locally');
+      }
+    } catch (err) {
+      console.error('Error updating stock on server', err);
+      // persist locally and inform user
+      try { inventory.setStock(id, count); } catch (e) { console.error(e); }
+      toast.error('Could not update stock on server — saved locally');
+    }
+  };
+
+  // Toggle availability via GraphQL mutation and update local cache
+  const toggleItemAvailability = async (id: string | number) => {
+    const existing = enhancedMenuItems.find(i => String(i.id) === String(id));
+    if (!existing) return;
+    try {
+      const { data: res } = await updateMenuItem({
+        variables: {
+          itemId: parseInt(String(id)),
+          currentUserId,
+          isAvailable: !existing.isAvailable,
+        }
+      });
+
+      if (res?.updateMenuItem?.success) {
+        setEnhancedMenuItems(prev => prev.map(i => String(i.id) === String(id) ? { ...i, isAvailable: !existing.isAvailable } : i));
+        toast.success('Item availability updated');
+      } else {
+        toast.error(res?.updateMenuItem?.message || 'Failed to update availability');
+      }
+    } catch (err) {
+      console.error('Error toggling availability', err);
+      toast.error('An error occurred while updating availability');
+    }
+  };
+
+  // Delete an item via GraphQL and remove from local list
+  const handleDeleteItem = async (id: string | number) => {
+    try {
+      const { data: res } = await deleteMenuItem({ variables: { itemId: parseInt(String(id)), currentUserId } });
+      if (res?.deleteMenuItem?.success) {
+        setEnhancedMenuItems(prev => prev.filter(i => String(i.id) !== String(id)));
+        toast.success('Menu item deleted');
+      } else {
+        toast.error(res?.deleteMenuItem?.message || 'Failed to delete menu item');
+      }
+    } catch (err) {
+      console.error('Error deleting menu item', err);
+      toast.error('An error occurred while deleting the item');
+    }
+  };
+  
   // Filter menu items based on search query, category, and availability
   const filteredItems = enhancedMenuItems.filter(item => {
     const matchesSearch = 
@@ -71,13 +193,13 @@ const VendorMenu = () => {
   const sortedItems = [...filteredItems].sort((a, b) => {
     switch (sortBy) {
       case 'name-asc':
-        return a.name.localeCompare(b.name);
+        return String(a.name).localeCompare(String(b.name));
       case 'name-desc':
-        return b.name.localeCompare(a.name);
+        return String(b.name).localeCompare(String(a.name));
       case 'price-asc':
-        return a.price - b.price;
+        return (a.price || 0) - (b.price || 0);
       case 'price-desc':
-        return b.price - a.price;
+        return (b.price || 0) - (a.price || 0);
       case 'popularity':
         return (b.orderCount || 0) - (a.orderCount || 0);
       case 'stock-asc':
@@ -88,36 +210,90 @@ const VendorMenu = () => {
         return 0;
     }
   });
-
-  // Handler for toggling item availability
-  const toggleItemAvailability = (itemId: string | number) => {
-    setEnhancedMenuItems(prev => 
-      prev.map(item => 
-        String(item.id) === String(itemId) 
-          ? { ...item, isAvailable: !item.isAvailable }
-          : item
-      )
-    );
-    
-    const item = enhancedMenuItems.find(item => String(item.id) === String(itemId));
-    if (item) {
-      toast.success(`${item.name} is now ${!item.isAvailable ? 'available' : 'unavailable'}`);
+  
+  // Handler for creating a new menu item
+  const handleCreateMenuItem = async () => {
+    try {
+      const { data } = await createMenuItem({
+        variables: {
+          name: newMenuItem.name,
+          price: parseFloat(String(newMenuItem.price)),
+          canteenId: selectedCanteenId,
+          canteenName: selectedCanteenName,
+          currentUserId,
+          description: newMenuItem.description,
+          image: newMenuItem.image,
+          category: newMenuItem.category,
+          tags: newMenuItem.tags,
+          isPopular: newMenuItem.isPopular,
+          preparationTime: parseInt(String(newMenuItem.preparationTime))
+        }
+      });
+      
+      if (data?.createMenuItem?.success) {
+        // Refetch menu items to get the new item
+        refetch();
+        setIsAddMenuItemOpen(false);
+        toast.success('Menu item created successfully');
+        
+        // Reset the form
+        setNewMenuItem({
+          name: '',
+          price: 0,
+          description: '',
+          category: 'main',
+          image: 'https://placehold.co/600x400',
+          tags: [],
+          isPopular: false,
+          preparationTime: 15,
+        });
+      } else {
+        toast.error(data?.createMenuItem?.message || 'Failed to create menu item');
+      }
+    } catch (error) {
+      console.error('Error creating menu item:', error);
+      toast.error('An error occurred while creating the menu item');
     }
   };
-
-  // Handler for updating stock count
-  const updateStockCount = (itemId: string | number, newCount: number) => {
-    setEnhancedMenuItems(prev => 
-      prev.map(item => 
-        String(item.id) === String(itemId) 
-          ? { ...item, stockCount: newCount }
-          : item
-      )
-    );
+  
+  // Handler for updating a menu item
+  const handleUpdateMenuItem = async () => {
+    if (!currentMenuItem) return;
     
-    const item = enhancedMenuItems.find(item => String(item.id) === String(itemId));
-    if (item) {
-      toast.success(`Updated stock for ${item.name} to ${newCount}`);
+    try {
+      const { data } = await updateMenuItem({
+        variables: {
+          itemId: parseInt(String(currentMenuItem.id)),
+          currentUserId,
+          name: currentMenuItem.name,
+          price: parseFloat(String(currentMenuItem.price)),
+          description: currentMenuItem.description,
+          image: currentMenuItem.image,
+          category: currentMenuItem.category,
+          isAvailable: currentMenuItem.isAvailable,
+          isPopular: currentMenuItem.isPopular,
+          preparationTime: parseInt(String(currentMenuItem.preparationTime))
+        }
+      });
+      
+      if (data?.updateMenuItem?.success) {
+        // Update the local state
+        setEnhancedMenuItems(prev => 
+          prev.map(item => 
+            String(item.id) === String(currentMenuItem.id) 
+              ? { ...currentMenuItem }
+              : item
+          )
+        );
+        
+        setIsEditMenuItemOpen(false);
+        toast.success('Menu item updated successfully');
+      } else {
+        toast.error(data?.updateMenuItem?.message || 'Failed to update menu item');
+      }
+    } catch (error) {
+      console.error('Error updating menu item:', error);
+      toast.error('An error occurred while updating the menu item');
     }
   };
 
@@ -126,7 +302,7 @@ const VendorMenu = () => {
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Menu Management</h1>
-          <Button>
+          <Button onClick={() => setIsAddMenuItemOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> Add New Item
           </Button>
         </div>
@@ -135,7 +311,7 @@ const VendorMenu = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search menu items..."
                   className="pl-10"
@@ -150,7 +326,7 @@ const VendorMenu = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
+                  {derivedCategories.map((category) => (
                     <SelectItem key={category.id} value={category.name}>
                       {category.name}
                     </SelectItem>
@@ -175,7 +351,7 @@ const VendorMenu = () => {
               
               <Button 
                 variant="outline" 
-                className={isAvailableOnly ? "bg-orange-100" : ""}
+                className={isAvailableOnly ? "bg-muted" : ""}
                 onClick={() => setIsAvailableOnly(!isAvailableOnly)}
               >
                 Available Only
@@ -191,11 +367,11 @@ const VendorMenu = () => {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-gray-500">Total Items</p>
+                    <p className="text-sm text-muted-foreground">Total Items</p>
                     <p className="text-2xl font-bold">{enhancedMenuItems.length}</p>
                   </div>
-                  <div className="p-3 bg-blue-50 rounded-full">
-                    <MenuSquare className="h-6 w-6 text-blue-500" />
+                  <div className="p-3 bg-muted rounded-full">
+                    <MenuSquare className="h-6 w-6 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -205,13 +381,13 @@ const VendorMenu = () => {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-gray-500">Available Items</p>
+                    <p className="text-sm text-muted-foreground">Available Items</p>
                     <p className="text-2xl font-bold">
                       {enhancedMenuItems.filter(item => item.isAvailable).length}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-50 rounded-full">
-                    <CheckCircle className="h-6 w-6 text-green-500" />
+                  <div className="p-3 bg-muted rounded-full">
+                    <CheckCircle className="h-6 w-6 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -221,13 +397,13 @@ const VendorMenu = () => {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm text-gray-500">Low Stock Items</p>
+                    <p className="text-sm text-muted-foreground">Low Stock Items</p>
                     <p className="text-2xl font-bold">
                       {enhancedMenuItems.filter(item => (item.stockCount || 0) < 10).length}
                     </p>
                   </div>
-                  <div className="p-3 bg-orange-50 rounded-full">
-                    <AlertTriangle className="h-6 w-6 text-orange-500" />
+                  <div className="p-3 bg-muted rounded-full">
+                    <AlertTriangle className="h-6 w-6 text-destructive" />
                   </div>
                 </div>
               </CardContent>
@@ -243,87 +419,122 @@ const VendorMenu = () => {
           </TabsList>
           
           <TabsContent value="all">
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-gray-50 border-b">
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {sortedItems.length > 0 ? (
-                      sortedItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                                <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+            {loading ? (
+              <div className="text-center py-10 bg-card rounded-lg shadow">
+                <p className="text-muted-foreground">Loading menu items...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-10 bg-card rounded-lg shadow">
+                <p className="text-destructive">Error loading menu items. Please try again.</p>
+              </div>
+            ) : (
+              <div className="bg-card rounded-lg shadow overflow-hidden border border-border">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-muted border-b border-border">
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Item</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Price</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Stock</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {sortedItems.length > 0 ? (
+                        sortedItems.map((item) => (
+                          <tr key={item.id} className="hover:bg-muted">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                                  <img
+                                    src={ensureImageSrc(item.image, item.id, 80, 80)}
+                                    alt={item.name}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 80, 80); }}
+                                  />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-primary">{item.name}</div>
+                                  <div className="text-sm text-muted-foreground truncate w-48">{item.description}</div>
+                                </div>
                               </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                                <div className="text-sm text-gray-500 truncate w-48">{item.description}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge variant="outline">{item.category}</Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-primary">₹{item.price.toFixed(2)}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <input
+                                  type="number"
+                                  className="w-16 p-1 text-sm border rounded border-border"
+                                  value={item.stockCount || 0}
+                                  onChange={(e) => updateStockCount(item.id, parseInt(e.target.value))}
+                                  min="0"
+                                />
+                                {(item.stockCount || 0) < 10 && (
+                                  <AlertTriangle className="h-4 w-4 text-destructive ml-2" />
+                                )}
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge variant="outline">{item.category}</Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">₹{item.price.toFixed(2)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <input
-                                type="number"
-                                className="w-16 p-1 text-sm border rounded"
-                                value={item.stockCount || 0}
-                                onChange={(e) => updateStockCount(item.id, parseInt(e.target.value))}
-                                min="0"
-                              />
-                              {(item.stockCount || 0) < 10 && (
-                                <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge variant={item.isAvailable ? "success" : "secondary"} className={!item.isAvailable ? "bg-gray-200" : ""}>
-                              {item.isAvailable ? "Available" : "Unavailable"}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => toggleItemAvailability(item.id)}>
-                              {item.isAvailable ? "Disable" : "Enable"}
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-red-500 hover:text-red-700">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge variant={item.isAvailable ? "success" : "secondary"} className={!item.isAvailable ? "bg-muted" : ""}>
+                                {item.isAvailable ? "Available" : "Unavailable"}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentMenuItem(item);
+                                  setIsEditMenuItemOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => toggleItemAvailability(item.id)}
+                              >
+                                {item.isAvailable ? "Disable" : "Enable"}
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-destructive"
+                                onClick={() => handleDeleteItem(item.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">
+                            No items found. Try adjusting your search or filters.
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
-                          No items found. Try adjusting your search or filters.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </TabsContent>
           
           <TabsContent value="popular">
-            {sortedItems.filter(item => item.isPopular).length > 0 ? (
+            {loading ? (
+              <div className="text-center py-10 bg-card rounded-lg shadow">
+                  <p className="text-muted-foreground">Loading popular items...</p>
+                </div>
+            ) : sortedItems.filter(item => item.isPopular).length > 0 ? (
               <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -343,7 +554,12 @@ const VendorMenu = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                                <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                                <img
+                                  src={ensureImageSrc(item.image, item.id, 40, 40)}
+                                  alt={item.name}
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 40, 40); }}
+                                />
                               </div>
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">{item.name}</div>
@@ -367,7 +583,7 @@ const VendorMenu = () => {
                                 min="0"
                               />
                               {(item.stockCount || 0) < 10 && (
-                                <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
+                                <AlertTriangle className="h-4 w-4 text-destructive ml-2" />
                               )}
                             </div>
                           </td>
@@ -377,13 +593,29 @@ const VendorMenu = () => {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setCurrentMenuItem(item);
+                                setIsEditMenuItemOpen(true);
+                              }}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => toggleItemAvailability(item.id)}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => toggleItemAvailability(item.id)}
+                            >
                               {item.isAvailable ? "Disable" : "Enable"}
                             </Button>
-                            <Button variant="outline" size="sm" className="text-red-500 hover:text-red-700">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-500 hover:text-red-700"
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </td>
@@ -401,7 +633,11 @@ const VendorMenu = () => {
           </TabsContent>
           
           <TabsContent value="low-stock">
-            {sortedItems.filter(item => (item.stockCount || 0) < 10).length > 0 ? (
+            {loading ? (
+              <div className="text-center py-10 bg-white rounded-lg shadow">
+                <p className="text-gray-500">Loading low stock items...</p>
+              </div>
+            ) : sortedItems.filter(item => (item.stockCount || 0) < 10).length > 0 ? (
               <div className="space-y-4">
                 <Alert variant="destructive">
                   <AlertTitle>Low Stock Warning</AlertTitle>
@@ -429,7 +665,12 @@ const VendorMenu = () => {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="h-10 w-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                                  <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                                  <img
+                                    src={ensureImageSrc(item.image, item.id, 40, 40)}
+                                    alt={item.name}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 40, 40); }}
+                                  />
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">{item.name}</div>
@@ -453,7 +694,7 @@ const VendorMenu = () => {
                                   min="0"
                                 />
                                 {(item.stockCount || 0) < 10 && (
-                                  <AlertTriangle className="h-4 w-4 text-orange-500 ml-2" />
+                                  <AlertTriangle className="h-4 w-4 text-destructive ml-2" />
                                 )}
                               </div>
                             </td>
@@ -463,13 +704,29 @@ const VendorMenu = () => {
                               </Badge>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentMenuItem(item);
+                                  setIsEditMenuItemOpen(true);
+                                }}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => toggleItemAvailability(item.id)}>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => toggleItemAvailability(item.id)}
+                              >
                                 {item.isAvailable ? "Disable" : "Enable"}
                               </Button>
-                              <Button variant="outline" size="sm" className="text-red-500 hover:text-red-700">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-500 hover:text-red-700"
+                                onClick={() => handleDeleteItem(item.id)}
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </td>
@@ -487,6 +744,237 @@ const VendorMenu = () => {
             )}
           </TabsContent>
         </Tabs>
+        
+        {/* Add Menu Item Dialog */}
+        <Dialog open={isAddMenuItemOpen} onOpenChange={setIsAddMenuItemOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Add New Menu Item</DialogTitle>
+              <DialogDescription>
+                Create a new menu item for your canteen.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={newMenuItem.name}
+                    onChange={(e) => setNewMenuItem({...newMenuItem, name: e.target.value})}
+                    placeholder="e.g. Butter Chicken"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={newMenuItem.description}
+                    onChange={(e) => setNewMenuItem({...newMenuItem, description: e.target.value})}
+                    placeholder="A short description of the dish"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price">Price (₹)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    value={newMenuItem.price}
+                    onChange={(e) => setNewMenuItem({...newMenuItem, price: parseFloat(e.target.value)})}
+                    placeholder="150"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={newMenuItem.category}
+                    onValueChange={(value) => setNewMenuItem({...newMenuItem, category: value})}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {derivedCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.name.toLowerCase()}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="preparationTime">Preparation Time (mins)</Label>
+                  <Input
+                    id="preparationTime"
+                    type="number"
+                    value={newMenuItem.preparationTime}
+                    onChange={(e) => setNewMenuItem({...newMenuItem, preparationTime: parseInt(e.target.value)})}
+                    placeholder="15"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="isPopular">Popular Item</Label>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="isPopular"
+                      checked={newMenuItem.isPopular}
+                      onChange={(e) => setNewMenuItem({...newMenuItem, isPopular: e.target.checked})}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="isPopular">Mark as popular</Label>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="image">Image URL</Label>
+                <Input
+                  id="image"
+                  value={newMenuItem.image}
+                  onChange={(e) => setNewMenuItem({...newMenuItem, image: e.target.value})}
+                  placeholder="https://example.com/image.jpg"
+                />
+                {newMenuItem.image && (
+                  <div className="mt-2">
+                    <img
+                      src={ensureImageSrc(newMenuItem.image, newMenuItem.name || 'new', 240, 160)}
+                      alt="Preview"
+                      className="h-24 w-auto object-cover rounded-md"
+                      onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(newMenuItem.name || 'new', 240, 160); }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddMenuItemOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleCreateMenuItem}>
+                Create Item
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Edit Menu Item Dialog */}
+        <Dialog open={isEditMenuItemOpen} onOpenChange={setIsEditMenuItemOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Menu Item</DialogTitle>
+              <DialogDescription>
+                Update information for this menu item.
+              </DialogDescription>
+            </DialogHeader>
+            {currentMenuItem && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label htmlFor="edit-name">Name</Label>
+                    <Input
+                      id="edit-name"
+                      value={currentMenuItem.name}
+                      onChange={(e) => setCurrentMenuItem({...currentMenuItem, name: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={currentMenuItem.description}
+                      onChange={(e) => setCurrentMenuItem({...currentMenuItem, description: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-price">Price (₹)</Label>
+                    <Input
+                      id="edit-price"
+                      type="number"
+                      value={currentMenuItem.price}
+                      onChange={(e) => setCurrentMenuItem({...currentMenuItem, price: parseFloat(e.target.value)})}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-category">Category</Label>
+                    <Select
+                      value={currentMenuItem.category}
+                      onValueChange={(value) => setCurrentMenuItem({...currentMenuItem, category: value})}
+                    >
+                      <SelectTrigger id="edit-category">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {derivedCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.name.toLowerCase()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-preparationTime">Preparation Time (mins)</Label>
+                    <Input
+                      id="edit-preparationTime"
+                      type="number"
+                      value={currentMenuItem.preparationTime}
+                      onChange={(e) => setCurrentMenuItem({...currentMenuItem, preparationTime: parseInt(e.target.value)})}
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-isPopular">Popular Item</Label>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <input
+                        type="checkbox"
+                        id="edit-isPopular"
+                        checked={currentMenuItem.isPopular}
+                        onChange={(e) => setCurrentMenuItem({...currentMenuItem, isPopular: e.target.checked})}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="edit-isPopular">Mark as popular</Label>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="edit-image">Image URL</Label>
+                  <Input
+                    id="edit-image"
+                    value={currentMenuItem.image}
+                    onChange={(e) => setCurrentMenuItem({...currentMenuItem, image: e.target.value})}
+                  />
+                  {currentMenuItem.image && (
+                    <div className="mt-2">
+                      <img
+                        src={ensureImageSrc(currentMenuItem.image, currentMenuItem.id, 240, 160)}
+                        alt="Preview"
+                        className="h-24 w-auto object-cover rounded-md"
+                        onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(currentMenuItem.id, 240, 160); }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditMenuItemOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleUpdateMenuItem}>
+                Update Item
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </VendorLayout>
   );

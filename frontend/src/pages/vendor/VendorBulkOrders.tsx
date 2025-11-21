@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useNotification } from "@/contexts/NotificationContext";
-import { canteens } from "@/data/mockData";
+import { formatIST, toISTDateISO } from '@/lib/ist';
+import { useQuery } from '@apollo/client';
+import { GET_CANTEENS } from '@/gql/queries/canteens';
 import {
   Calendar,
   Clock,
@@ -165,6 +167,9 @@ const VendorBulkOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const { addNotification } = useNotification();
 
+  const { data: canteenData } = useQuery(GET_CANTEENS, { fetchPolicy: 'cache-first' });
+  const canteens = canteenData?.getAllCanteens || [];
+
   // Filter orders by canteen and status
   const filteredOrders = bulkOrders.filter(order => {
     const matchesCanteen = order.canteenId === selectedCanteen;
@@ -194,14 +199,9 @@ const VendorBulkOrders = () => {
     });
   };
 
-  // Format date function
+  // Format date function using IST helper
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return formatIST(dateString, { day: 'numeric', month: 'short', year: 'numeric' }, 'en-US');
   };
 
   // Handle viewing order details
@@ -259,7 +259,7 @@ const VendorBulkOrders = () => {
                 <SelectValue placeholder="Select Canteen" />
               </SelectTrigger>
               <SelectContent>
-                {canteens.map((canteen) => (
+                {canteens.map((canteen: any) => (
                   <SelectItem key={canteen.id} value={canteen.id.toString()}>
                     {canteen.name}
                   </SelectItem>
@@ -617,7 +617,7 @@ const VendorBulkOrders = () => {
                 
                 <div>
                   <p className="text-sm font-medium">Created On</p>
-                  <p>{new Date(selectedOrder.createdAt).toLocaleDateString()}</p>
+                  <p>{formatIST(selectedOrder.createdAt, { day: 'numeric', month: 'short', year: 'numeric' }, 'en-US')}</p>
                 </div>
               </div>
               

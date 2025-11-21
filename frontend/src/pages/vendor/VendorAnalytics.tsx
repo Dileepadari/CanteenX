@@ -1,12 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import VendorLayout from '@/components/layout/VendorLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { BarChart, LineChart, PieChart } from '@/components/ui/charts';
-import { orders, menuItems } from '@/data/mockData';
+// import { orders, menuItems } from '@/data/mockData';
+import { GET_CANTEEN_ORDERS } from "@/gql/queries/orders";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client";
+import { GET_MENU_ITEMS_BY_CANTEEN } from "@/gql/queries/menuItems";
+
 import { ArrowUpRight, TrendingUp, TrendingDown, DollarSign, Users, ShoppingBag } from 'lucide-react';
+
+interface MenuItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+}
+
+interface OrderItem {
+  itemId: string;
+  quantity: number;
+}
+
+interface Order {
+  id: number;
+  userId: string;
+  canteenId: number;
+  totalAmount: number;
+  orderTime: string;
+  items: OrderItem[];
+}
 
 // Helper function to generate random data for charts
 const generateRandomData = (length: number, min: number, max: number) => {
@@ -24,22 +49,54 @@ const getMonths = () => {
 };
 
 const VendorAnalytics = () => {
+  const client = useApolloClient();
   const [timeRange, setTimeRange] = useState('week');
   const [chartType, setChartType] = useState('revenue');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [selectedCanteen, setSelectedCanteen] = useState<number>(1);
+
+  const fetchData = async () => {
+    try {
+      const [ordersResponse, menuItemsResponse] = await Promise.all([
+        client.query({
+          query: GET_CANTEEN_ORDERS,
+          variables: { canteenId: selectedCanteen },
+          fetchPolicy: 'network-only',
+        }),
+        client.query({
+          query: GET_MENU_ITEMS_BY_CANTEEN,
+          variables: { canteenId: selectedCanteen },
+          fetchPolicy: 'network-only',
+        })
+      ]);
+      
+      setOrders(ordersResponse.data.getCanteenOrders || []);
+      setMenuItems(menuItemsResponse.data.getMenuItemsByCanteen || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedCanteen]);
   
-  // Filter vendor's orders (assuming vendor ID is 1)
-  const vendorOrders = orders.filter(order => String(order.canteenId) === "1");
-  
-  // Calculate total revenue
-  const totalRevenue = vendorOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-  
-  // Calculate total orders
-  const totalOrders = vendorOrders.length;
-  
-  // Calculate average order value
-  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-  
-  // Generate random data for charts based on selected time range
+
+  // Define state variables for analytics
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [averageOrderValue, setAverageOrderValue] = useState(0);
+
+  // Update analytics when orders are fetched
+  useEffect(() => {
+    if (orders) {
+      setTotalRevenue(orders.reduce((sum, order) => sum + order.totalAmount, 0));
+      setTotalOrders(orders.length);
+      setAverageOrderValue(orders.length > 0 ? orders.reduce((sum, order) => sum + order.totalAmount, 0) / orders.length : 0);
+    }
+  }, [orders]);
+
   const getLabels = () => {
     switch (timeRange) {
       case 'week':
@@ -52,70 +109,109 @@ const VendorAnalytics = () => {
         return getDaysOfWeek();
     }
   };
-  
+
   const getChartData = () => {
-    const labels = getLabels();
-    const length = labels.length;
+    if (!orders) return null;
     
+    // Group orders by date/month/year based on timeRange
+    const groupedData = new Map();
+    const labels = getLabels();
+    
+    orders.forEach(order => {
+      const orderDate = new Date(order.orderTime);
+      let key;
+      
+      switch (timeRange) {
+        case 'week':
+          key = getDaysOfWeek()[orderDate.getDay()];
+          break;
+        case 'month':
+          key = orderDate.getDate().toString();
+          break;
+        case 'year':
+          key = getMonths()[orderDate.getMonth()];
+          break;
+      }
+      
+      if (!groupedData.has(key)) {
+        groupedData.set(key, {
+          revenue: 0,
+          orders: 0,
+          customers: new Set()
+        });
+      }
+      
+      const data = groupedData.get(key);
+      data.revenue += order.totalAmount;
+      data.orders += 1;
+      data.customers.add(order.userId);
+    });
+    
+    // Create datasets based on selected chart type
     switch (chartType) {
       case 'revenue':
         return {
           labels,
-          datasets: [
-            {
-              label: 'Revenue',
-              data: generateRandomData(length, 500, 5000),
-              borderColor: 'rgb(99, 102, 241)',
-              backgroundColor: 'rgba(99, 102, 241, 0.5)',
-            },
-          ],
+          datasets: [{
+            label: 'Revenue',
+            data: labels.map(label => groupedData.get(label)?.revenue || 0),
+            borderColor: 'rgb(99, 102, 241)',
+            backgroundColor: 'rgba(99, 102, 241, 0.5)',
+          }],
         };
       case 'orders':
         return {
           labels,
-          datasets: [
-            {
-              label: 'Orders',
-              data: generateRandomData(length, 5, 50),
-              borderColor: 'rgb(34, 197, 94)',
-              backgroundColor: 'rgba(34, 197, 94, 0.5)',
-            },
-          ],
+          datasets: [{
+            label: 'Orders',
+            data: labels.map(label => groupedData.get(label)?.orders || 0),
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.5)',
+          }],
         };
       case 'customers':
         return {
           labels,
-          datasets: [
-            {
-              label: 'Customers',
-              data: generateRandomData(length, 3, 40),
-              borderColor: 'rgb(249, 115, 22)',
-              backgroundColor: 'rgba(249, 115, 22, 0.5)',
-            },
-          ],
-        };
-      default:
-        return {
-          labels,
-          datasets: [
-            {
-              label: 'Revenue',
-              data: generateRandomData(length, 500, 5000),
-              borderColor: 'rgb(99, 102, 241)',
-              backgroundColor: 'rgba(99, 102, 241, 0.5)',
-            },
-          ],
+          datasets: [{
+            label: 'Unique Customers',
+            data: labels.map(label => groupedData.get(label)?.customers.size || 0),
+            borderColor: 'rgb(249, 115, 22)',
+            backgroundColor: 'rgba(249, 115, 22, 0.5)',
+          }],
         };
     }
   };
-  
+
   // Generate data for pie chart (menu item categories)
-  const categoryData = {
-    labels: ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Beverages'],
-    datasets: [
-      {
+  const getCategoryData = () => {
+    if (!orders) return null;
+    
+    const categoryCount = new Map();
+    let total = 0;
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const menuItem = menuItems.find(mi => mi.id === item.itemId);
+        if (menuItem) {
+          const category = menuItem.category || 'Other';
+          categoryCount.set(
+            category, 
+            (categoryCount.get(category) || 0) + item.quantity
+          );
+          total += item.quantity;
+        }
+      });
+    });
+    
+    const sortedCategories = Array.from(categoryCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    
+    return {
+      labels: sortedCategories.map(([category]) => category),
+      datasets: [{
         label: 'Sales by Category',
-        data: [25, 30, 20, 15, 10],
+        data: sortedCategories.map(([_, count]) => (count / total) * 100),
         backgroundColor: [
           'rgba(255, 99, 132, 0.7)',
           'rgba(54, 162, 235, 0.7)',
@@ -124,22 +220,76 @@ const VendorAnalytics = () => {
           'rgba(153, 102, 255, 0.7)',
         ],
         borderWidth: 1,
-      },
-    ],
+      }],
+    };
   };
-  
-  // Generate data for bar chart (top menu items)
-  const topItemsData = {
-    labels: ['Masala Dosa', 'Veg Biryani', 'Paneer Butter Masala', 'Chicken Curry', 'Vada Pav'],
-    datasets: [
-      {
+
+  // Get sales by time of day
+  const getTimeOfDayData = () => {
+    if (!orders) return null;
+    
+    const timeSlots = {
+      morning: 0,   // 6-11
+      afternoon: 0, // 11-16
+      evening: 0,   // 16-21
+      night: 0      // 21-6
+    };
+    
+    orders.forEach(order => {
+      const orderHour = new Date(order.orderTime).getHours();
+      
+      if (orderHour >= 6 && orderHour < 11) timeSlots.morning++;
+      else if (orderHour >= 11 && orderHour < 16) timeSlots.afternoon++;
+      else if (orderHour >= 16 && orderHour < 21) timeSlots.evening++;
+      else timeSlots.night++;
+    });
+    
+    return {
+      labels: ['Morning (6-11)', 'Afternoon (11-16)', 'Evening (16-21)', 'Night (21-6)'],
+      datasets: [{
+        label: 'Orders by Time of Day',
+        data: Object.values(timeSlots),
+        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+      }],
+    };
+  };
+
+  // Get top selling items data
+  const getTopItemsData = () => {
+    if (!orders || !menuItems) return null;
+    
+    const itemSales = new Map();
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        itemSales.set(
+          item.itemId, 
+          (itemSales.get(item.itemId) || 0) + item.quantity
+        );
+      });
+    });
+    
+    const topItems = Array.from(itemSales.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([itemId, quantity]) => {
+        const menuItem = menuItems.find(mi => mi.id === itemId);
+        return {
+          name: menuItem ? menuItem.name : 'Unknown Item',
+          quantity
+        };
+      });
+    
+    return {
+      labels: topItems.map(item => item.name),
+      datasets: [{
         label: 'Orders',
-        data: [120, 98, 85, 75, 60],
+        data: topItems.map(item => item.quantity),
         backgroundColor: 'rgba(54, 162, 235, 0.7)',
-      },
-    ],
+      }],
+    };
   };
-  
+
   return (
     <VendorLayout>
       <div className="container mx-auto p-6">
@@ -194,8 +344,8 @@ const VendorAnalytics = () => {
                     <span>3% from last month</span>
                   </div>
                 </div>
-                <div className="p-3 bg-orange-50 rounded-full">
-                  <Users className="h-6 w-6 text-orange-500" />
+                <div className="p-3 bg-muted/10 rounded-full">
+                  <Users className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </CardContent>
@@ -259,7 +409,7 @@ const VendorAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    <PieChart data={categoryData} />
+                    <PieChart data={getCategoryData()} />
                   </div>
                 </CardContent>
               </Card>
@@ -272,15 +422,13 @@ const VendorAnalytics = () => {
                 <CardContent>
                   <div className="h-[300px]">
                     <BarChart 
-                      data={{
+                      data={getTimeOfDayData() || {
                         labels: ['Morning', 'Afternoon', 'Evening', 'Night'],
-                        datasets: [
-                          {
-                            label: 'Orders',
-                            data: [25, 40, 30, 5],
-                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
-                          },
-                        ],
+                        datasets: [{
+                          label: 'Orders',
+                          data: [0, 0, 0, 0],
+                          backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        }],
                       }} 
                     />
                   </div>
@@ -298,7 +446,7 @@ const VendorAnalytics = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
-                    <BarChart data={topItemsData} />
+                    <BarChart data={getTopItemsData()} />
                   </div>
                 </CardContent>
               </Card>

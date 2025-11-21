@@ -8,60 +8,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useUserStore } from "@/stores/userStore";
-import { ArrowRight, Loader2 } from "lucide-react";
-import { LOGIN_MUTATION } from "@/gql/mutations/user";
+import { Loader2 } from "lucide-react";
+import { LOGIN_MUTATION, INITIATE_CAS_LOGIN_MUTATION, SIGNUP_MUTATION } from "@/gql/mutations/auth_mutations";
 import { useMutation } from "@apollo/client";
-
-const simulateCASAuthentication = (email: string, password: string) => {
-  return new Promise<{ success: boolean; user?: any; error?: string }>((resolve) => {
-    setTimeout(() => {
-      // This is just a simulation - in a real app, this would be a proper CAS integration
-      if (email.includes("@campus.edu") && password.length >= 6) {
-        const [username] = email.split("@");
-        let role: "student" | "faculty" | "staff" = "student";
-        
-        if (email.includes("faculty")) {
-          role = "faculty";
-        } else if (email.includes("staff")) {
-          role = "staff";
-        }
-        
-        resolve({
-          success: true,
-          user: {
-            id: `user-${Math.floor(Math.random() * 1000)}`,
-            name: username.charAt(0).toUpperCase() + username.slice(1),
-            email,
-            role,
-            department: role === "faculty" ? "Computer Science" : undefined,
-            canteenCredits: 0,
-          }
-        });
-      } else {
-        resolve({
-          success: false,
-          error: "Invalid campus credentials"
-        });
-      }
-    }, 1500);
-  });
-};
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isCASOauth, setIsCASOauth] = useState(false);
-  
+  const [isCASLoading, setIsCASLoading] = useState(false);
 
   const { toast } = useToast();
   const { login } = useUserStore();
   const navigate = useNavigate();
 
-  
-
   const [loginMutation] = useMutation(LOGIN_MUTATION);
+  const [signupMutation] = useMutation(SIGNUP_MUTATION);
+  const [initiateCasLogin] = useMutation(INITIATE_CAS_LOGIN_MUTATION);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,22 +40,21 @@ const Login = () => {
         },
       });
 
-      if (data?.login?.message === "Invalid credentials") {
-        toast({
-          title: "Login Failed",
-          description: data.login.error,
-          variant: "destructive",
-        });
-        return;
-      }
       if (data?.login?.user) {
-        console.log("Login successful:", data.login.user);
-        localStorage.setItem("authToken", data.login.user.id); // Example: Save user ID as token
+        const u = data.login.user;
+        login(u);
         toast({
           title: "Login Successful",
-          description: `Welcome back, ${data.login.user.username}!`,
+          description: `Welcome back, ${u.name}!`,
         });
-        navigate("/"); // Redirect to dashboard or another page
+        // Role-aware redirect: vendor -> vendor dashboard, admin -> admin dashboard, others -> home
+        if (u.role === 'vendor') {
+          navigate('/vendor/dashboard');
+        } else if (u.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/');
+        }
       } else {
         toast({
           title: "Login Failed",
@@ -108,224 +72,256 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-  
-  const handleCASLogin = () => {
-    setIsCASOauth(true);
-    
-    // Simulate redirecting to CAS and coming back with authentication
-    setTimeout(() => {
-      const mockUser = {
-        id: `user-${Math.floor(Math.random() * 1000)}`,
-        name: "John Doe",
-        email: "johndoe@campus.edu",
-        role: "student" as "student" | "faculty" | "staff",
-        canteenCredits: 0,
-      };
-      
-      login(mockUser);
-      
-      toast({
-        title: "CAS Authentication successful",
-        description: `Welcome back, ${mockUser.name}!`,
-      });
-      
-      navigate('/');
-    }, 3000);
-  };
 
-  const handleVendorLogin = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // In a real app, you would perform actual authentication here
-    // This is just a mock for demonstration purposes
-    toast({
-      title: "Vendor Login Successful",
-      description: "Welcome to your dashboard!",
-    });
-    
-    navigate("/vendor/dashboard");
+    setIsLoading(true);
+
+    try {
+      const { data } = await signupMutation({
+        variables: {
+          name,
+          email,
+          password,
+        },
+      });
+
+      if (data?.signup?.user) {
+        const u = data.signup.user;
+        login(u);
+        toast({
+          title: "Signup Successful",
+          description: `Welcome, ${u.name}!`,
+        });
+        // New signups are typically non-admin/vendors; route defensively
+        if (u.role === 'vendor') navigate('/vendor/dashboard');
+        else if (u.role === 'admin') navigate('/admin/dashboard');
+        else navigate('/');
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: data?.signup?.message || "Could not create account.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const handleCASLogin = async () => {
+    setIsCASLoading(true);
+    try {
+      const { data } = await initiateCasLogin();
+      if (data?.initiateCasLogin) {
+        window.location.href = data.initiateCasLogin;
+      } else {
+        throw new Error("Could not get CAS login URL");
+      }
+    } catch (error) {
+      toast({
+        title: "CAS Login Failed",
+        description: "Could not redirect to CAS. Please try again.",
+        variant: "destructive",
+      });
+      setIsCASLoading(false);
+    }
+  };
+
+  const handleVendorLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const { data } = await loginMutation({
+        variables: {
+          username: email,
+          password,
+        },
+      });
+
+      if (data?.login?.user && data?.login?.user.role === 'vendor') {
+        login(data.login.user);
+        toast({
+          title: "Vendor Login Successful",
+          description: "Welcome to your dashboard!",
+        });
+        navigate("/vendor/dashboard");
+      } else {
+        toast({
+          title: "Vendor Login Failed",
+          description: "Invalid vendor credentials.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div className="min-h-screen bg-muted/10 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Link to="/" className="inline-block">
             <div className="flex items-center justify-center">
-              <span className="text-3xl font-bold text-canteen-orange">Smart</span>
-              <span className="text-3xl font-bold text-canteen-blue">Canteen</span>
+              <span className="text-3xl font-bold text-primary">Smart</span>
+              <span className="text-3xl font-bold text-muted-foreground">Canteen</span>
             </div>
           </Link>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome back</h2>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Sign in to access your account
+            Sign in or create an account
           </p>
         </div>
 
-        <Tabs defaultValue="student" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="student">Student / Faculty</TabsTrigger>
-            <TabsTrigger value="vendor">Canteen Vendor</TabsTrigger>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-8">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsTrigger value="vendor">Vendor</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="student">
-            <Card className="border border-orange-100 shadow-lg animate-fade-in">
-              <CardHeader className="space-y-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-t-lg">
-                <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-                <CardDescription className="text-orange-100">
-                  Enter your campus credentials to continue
-                </CardDescription>
+          <TabsContent value="login">
+            <Card>
+              <CardHeader>
+                <CardTitle>Student / Faculty Login</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                {!isCASOauth ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your.name@campus.edu"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                        className="border-orange-200 focus:border-orange-500"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="password">Password</Label>
-                        <Button variant="link" className="px-0 h-auto text-xs text-orange-500">
-                          Forgot password?
-                        </Button>
-                      </div>
-                      <Input
-                        id="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                        className="border-orange-200 focus:border-orange-500"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center py-6 space-y-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-                    <div className="text-center">
-                      <p className="font-medium">Redirecting to Campus Authentication Service...</p>
-                      <p className="text-sm text-gray-500 mt-1">You will be redirected back after authentication</p>
-                    </div>
-                  </div>
-                )}
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your.name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading || isCASLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading || isCASLoading}
+                  />
+                </div>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
-                {!isCASOauth && (
-                  <>
-                    <Button 
-                      className="w-full bg-orange-500 hover:bg-orange-600" 
-                      onClick={handleLogin}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in...
-                        </>
-                      ) : (
-                        <>Sign in</>
-                      )}
-                    </Button>
-                    
-                    <div className="relative flex items-center">
-                      <div className="flex-1 border-t"></div>
-                      <div className="px-3 text-xs text-muted-foreground">OR</div>
-                      <div className="flex-1 border-t"></div>
-                    </div>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full border-orange-200 text-orange-600 hover:bg-orange-50" 
-                      onClick={handleCASLogin}
-                      disabled={isLoading}
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="w-4 h-4 mr-2"
-                      >
-                        <rect width="20" height="16" x="2" y="4" rx="2"/>
-                        <path d="M10 4v4"/>
-                        <path d="M2 8h20"/>
-                        <path d="M6 4v4"/>
-                      </svg>
-                      Sign in with Campus CAS
-                    </Button>
-                  </>
-                )}
+                <Button onClick={handleLogin} disabled={isLoading || isCASLoading} className="w-full">
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Sign in"}
+                </Button>
+                <div className="relative flex items-center w-full">
+                  <div className="flex-1 border-t"></div>
+                  <div className="px-3 text-xs text-muted-foreground">OR</div>
+                  <div className="flex-1 border-t"></div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleCASLogin}
+                  disabled={isLoading || isCASLoading}
+                  className="w-full"
+                >
+                  {isCASLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Sign in with Campus CAS"}
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="signup">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create an Account</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Your Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your.name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleSignup} disabled={isLoading} className="w-full">
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Sign Up"}
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>
 
           <TabsContent value="vendor">
             <Card>
-              <CardHeader className="space-y-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-t-lg">
-                <CardTitle className="text-2xl font-bold">Vendor Login</CardTitle>
-                <CardDescription className="text-orange-100">
-                  Sign in to manage your canteen
-                </CardDescription>
+              <CardHeader>
+                <CardTitle>Vendor Login</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 pt-6">
-                <form onSubmit={handleVendorLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vendor-email">Email</Label>
-                    <Input 
-                      id="vendor-email" 
-                      type="email" 
-                      placeholder="vendor@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="vendor-password">Password</Label>
-                      <Link to="/forgot-password" className="text-sm text-canteen-blue hover:underline">
-                        Forgot password?
-                      </Link>
-                    </div>
-                    <Input 
-                      id="vendor-password" 
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="vendor-remember" 
-                      checked={rememberMe} 
-                      onCheckedChange={() => setRememberMe(!rememberMe)} 
-                    />
-                    <Label htmlFor="vendor-remember" className="text-sm">Remember me</Label>
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    Sign in
-                  </Button>
-                </form>
-              </CardContent>
-              <CardFooter className="flex flex-col">
-                <div className="text-sm text-gray-500 text-center mt-2">
-                  <span>Vendor registration is by invitation only</span>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vendor-email">Email</Label>
+                  <Input
+                    id="vendor-email"
+                    type="email"
+                    placeholder="vendor@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vendor-password">Password</Label>
+                  <Input
+                    id="vendor-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button onClick={handleVendorLogin} disabled={isLoading} className="w-full">
+                  {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "Sign in as Vendor"}
+                </Button>
               </CardFooter>
             </Card>
           </TabsContent>

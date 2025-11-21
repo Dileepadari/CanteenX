@@ -8,7 +8,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/contexts/CartContext';
-import { canteens } from '@/data/mockData';
+import { useQuery } from '@apollo/client';
+import { GET_CANTEENS } from '@/gql/queries/canteens';
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
 
 interface CustomizationOption {
   id: string;
@@ -48,8 +50,10 @@ const CustomizableMenuItem: React.FC<CustomizableMenuItemProps> = ({ item, onClo
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string[]>>({});
   const [specialInstructions, setSpecialInstructions] = useState('');
   
-  // Find canteen info
-  const canteen = canteens.find(c => c.id === item.canteenId);
+  // Fetch canteens (cache-first) and find canteen info
+  const { data: canteenData } = useQuery(GET_CANTEENS, { fetchPolicy: 'cache-first' });
+  const canteens = canteenData?.getAllCanteens || [];
+  const canteen = canteens.find((c: any) => String(c.id) === String(item.canteenId));
   
   // Calculate total price with customizations
   const calculateTotalPrice = () => {
@@ -155,10 +159,11 @@ const CustomizableMenuItem: React.FC<CustomizableMenuItemProps> = ({ item, onClo
   return (
     <Card className="w-full max-w-md mx-auto">
       <div className="relative h-48">
-        <img 
-          src={item.image} 
-          alt={item.name} 
+        <img
+          src={ensureImageSrc(item.image, item.id, 800, 480)}
+          alt={item.name}
           className="w-full h-full object-cover rounded-t-lg"
+          onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(item.id, 800, 480); }}
         />
         {!item.isAvailable && (
           <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center rounded-t-lg">

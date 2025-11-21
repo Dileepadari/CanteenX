@@ -1,90 +1,50 @@
 import strawberry
 from typing import List, Optional
-from app.models.user import User
-from app.core.database import get_db
-from app.models.order import Order
-from app.models.user_types import UserType  # Import from a central location
+from strawberry.types import Info
+from sqlalchemy.orm import Session
+
+from app.models.user import User, UserType
+from app.helpers.permissions import IsAuthenticated
 
 @strawberry.type
-class UserProfileType:
-    user: UserType
-    favorite_canteen_id: Optional[int] = None
-    dietary_preferences: List[str] = strawberry.field(default_factory=list)
-    recent_orders: List[int] = strawberry.field(default_factory=list)
+class UserQueries:
+    @strawberry.field(permission_classes=[IsAuthenticated])
+    def get_user_by_id(self, user_id: str, info: Info) -> Optional[UserType]:
+        """Get a specific user by their ID.
 
-def resolve_get_users() -> List[UserType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query all users
-    users = db.query(User).all()
-    
-    # Convert to UserType with additional default fields
-    return [
-        UserType(
-            id=user.id,
-            name=user.name,
-            email=user.email,
-            profile_picture=f"/assets/profiles/user{user.id}.jpg" if user.id < 3 else None,
-            preferred_payment="Credit Card" if user.id == 1 else ("Mobile Payment" if user.id == 2 else None)
-        )
-        for user in users
-    ]
+        Accepts user_id as a string (UUID) or a numeric value from legacy callers;
+        the value is coerced to string before querying to avoid SQL type errors
+        when the DB column is VARCHAR/UUID.
+        """
+        db: Session = info.context["db"]
+        # coerce to string to avoid comparisons between varchar and int
+        return db.query(User).filter(User.id == str(user_id)).first()
 
-def resolve_get_user_by_id(user_id: str) -> Optional[UserType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Query for the specific user
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    if not user:
-        return None
-    
-    # Convert to UserType with additional default fields
-    return UserType(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        profile_picture=f"/assets/profiles/user{user.id}.jpg" if user.id < 3 else None,
-        preferred_payment="Credit Card" if user.id == 1 else ("Mobile Payment" if user.id == 2 else None)
-    )
+    @strawberry.field(permission_classes=[IsAuthenticated])
+    def get_user_by_email(self, email: str, info: Info) -> Optional[UserType]:
+        """Get a specific user by their email address."""
+        db: Session = info.context["db"]
+        return db.query(User).filter(User.email == email).first()
 
-def resolve_get_user_profile(user_id: str) -> Optional[UserProfileType]:
-    # Get database session
-    db = next(get_db())
-    
-    # Get the user
-    user = resolve_get_user_by_id(user_id)
-    if not user:
-        return None
-    
-    # Mock dietary preferences based on user id (in a real app, this would be in a user_preferences table)
-    dietary_preferences = []
-    if user_id == 1:
-        dietary_preferences = ["Vegetarian", "Low Carb"]
-    elif user_id == 2:
-        dietary_preferences = ["Halal"]
-    
-    # Get recent order IDs for the user
-    recent_orders_query = db.query(Order.id).filter(Order.user_id == user_id).order_by(Order.date.desc()).limit(3)
-    recent_order_ids = [int(order_id[0].replace("ORD", "")) for order_id in recent_orders_query.all()]
-    
-    # Create user profile
-    return UserProfileType(
-        user=user,
-        favorite_canteen_id=1 if user_id == 1 else (2 if user_id == 2 else None), # Mock favorite canteen
-        dietary_preferences=dietary_preferences,
-        recent_orders=recent_order_ids
-    )
+    @strawberry.field(permission_classes=[IsAuthenticated])
+    def get_users_by_role(self, role: str, info: Info) -> List[UserType]:
+        """Get a list of all users with a specific role."""
+        db: Session = info.context["db"]
+        return db.query(User).filter(User.role == role).all()
 
-# Create properly decorated fields with resolvers and matching frontend field names
-getUsers = strawberry.field(name="getUsers", resolver=resolve_get_users)
-getUserById = strawberry.field(name="getUserById", resolver=resolve_get_user_by_id)
-getUserProfile = strawberry.field(name="getUserProfile", resolver=resolve_get_user_profile)
+    @strawberry.field(permission_classes=[IsAuthenticated])
+    def search_users(self, query: str, info: Info) -> List[UserType]:
+        """Search for users by name or email."""
+        db: Session = info.context["db"]
+        search_filter = f"%{query}%"
+        return db.query(User).filter(
+            (User.name.ilike(search_filter)) |
+            (User.email.ilike(search_filter))
+        ).all()
 
-queries = [
-    getUsers,
-    getUserById,
-    getUserProfile
-]
+    @strawberry.field
+    def get_current_user(self, info: Info) -> Optional[UserType]:
+        """Return the current authenticated user or None if unauthenticated."""
+        # This resolver already followed the correct pattern.
+        user = info.context.get("user")
+        return user

@@ -1,7 +1,7 @@
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Filter, MapPin, Clock } from "lucide-react";
+import { Search, MapPin, Clock } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { canteens } from "@/data/mockData";
+import { useToast } from "@/hooks/use-toast";
+import { useApolloClient } from "@apollo/client"; // Import Apollo Client
+import { GET_CANTEENS } from "@/gql/queries/canteens"; // Added import for the query
+import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
+
 
 // Define filters
 interface FiltersState {
@@ -40,6 +44,33 @@ const Canteens = () => {
     isOpen: null,
     sortBy: "popularity",
   });
+
+  const [canteens, setCanteens] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { toast } = useToast();
+  const client = useApolloClient(); // Get Apollo Client instance
+
+  useEffect(() => {
+    const fetchCanteens = async () => {
+      try {
+        setLoading(true);
+        const { data } = await client.query({ query: GET_CANTEENS });
+        setCanteens(data?.getAllCanteens || []);
+      } catch (err) {
+        setError(err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch canteens.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCanteens();
+  }, [client, toast]);
+
 
   // Filter canteens based on current filters
   const filteredCanteens = canteens.filter((canteen) => {
@@ -93,81 +124,22 @@ const Canteens = () => {
             />
           </div>
 
-          {/* Filter */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <span>Filter</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Filter Canteens</SheetTitle>
-                <SheetDescription>
-                  Customize your search for campus canteens.
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="py-4 space-y-6">
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Open Status</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="open"
-                        checked={filters.isOpen === true}
-                        onCheckedChange={() =>
-                          setFilters({
-                            ...filters,
-                            isOpen: filters.isOpen === true ? null : true,
-                          })
-                        }
-                      />
-                      <Label htmlFor="open">Open Now</Label>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Sort By</h3>
+                  {/* Open status selector (replaces redundant filter sheet) */}
                   <Select
-                    value={filters.sortBy}
+                    value={filters.isOpen === null ? "all" : filters.isOpen ? "open" : "closed"}
                     onValueChange={(value) =>
-                      setFilters({ ...filters, sortBy: value })
+                      setFilters({ ...filters, isOpen: value === "all" ? null : value === "open" })
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select sorting" />
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="popularity">Popularity</SelectItem>
-                      <SelectItem value="rating">Rating</SelectItem>
-                      <SelectItem value="name">Name (A-Z)</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="open">Open Now</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <Separator />
-
-                <Button
-                  onClick={() =>
-                    setFilters({
-                      search: "",
-                      isOpen: null,
-                      sortBy: "popularity",
-                    })
-                  }
-                  variant="outline"
-                  className="w-full"
-                >
-                  Reset Filters
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
 
           {/* Sort */}
           <Select
@@ -201,9 +173,10 @@ const Canteens = () => {
                 <Card className="overflow-hidden h-full flex flex-col">
                   <div className="h-48 relative">
                     <img
-                      src={canteen.image}
+                      src={ensureImageSrc(canteen.image, canteen.id, 640, 320)}
                       alt={canteen.name}
                       className="h-full w-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(canteen.id, 640, 320); }}
                     />
                     {!canteen.isOpen && (
                       <div className="absolute top-2 right-2">

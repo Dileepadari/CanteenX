@@ -1,7 +1,6 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { menuItems as allMenuItems } from "@/data/mockData";
 
 export interface CartItem {
   id: number;

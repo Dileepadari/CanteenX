@@ -28,6 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useNotification } from '@/contexts/NotificationContext';
+import { formatIST } from '@/lib/ist';
 
 const VendorPromotions = () => {
   const { toast } = useToast();
@@ -143,15 +144,15 @@ const VendorPromotions = () => {
   const getPromotionIcon = (type) => {
     switch (type) {
       case 'percentage':
-        return <Tag className="h-10 w-10 text-blue-500" />;
+        return <Tag className="h-10 w-10 text-primary" />;
       case 'fixed':
-        return <Tag className="h-10 w-10 text-green-500" />;
+        return <Tag className="h-10 w-10 text-primary" />;
       case 'bundle':
-        return <ShoppingBag className="h-10 w-10 text-purple-500" />;
+        return <ShoppingBag className="h-10 w-10 text-primary" />;
       case 'time-based':
-        return <AlarmClock className="h-10 w-10 text-orange-500" />;
+        return <AlarmClock className="h-10 w-10 text-primary" />;
       default:
-        return <Tag className="h-10 w-10 text-gray-500" />;
+        return <Tag className="h-10 w-10 text-muted-foreground" />;
     }
   };
 
@@ -179,7 +180,7 @@ const VendorPromotions = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {promotions.map(promo => (
-              <Card key={promo.id} className={promo.active ? 'border-green-300' : ''}>
+              <Card key={promo.id} className={promo.active ? 'border-border' : ''}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div className="flex items-start gap-4">
                     <div className="rounded-full bg-gray-100 p-2">
@@ -217,7 +218,7 @@ const VendorPromotions = () => {
                     
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="h-4 w-4 mr-2" />
-                      {new Date(promo.startDate).toLocaleDateString()} to {new Date(promo.endDate).toLocaleDateString()}
+                      {formatIST(promo.startDate, { year: 'numeric', month: 'short', day: '2-digit' })} to {formatIST(promo.endDate, { year: 'numeric', month: 'short', day: '2-digit' })}
                     </div>
                     
                     {promo.discount && (
@@ -285,7 +286,7 @@ const VendorPromotions = () => {
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!promotionToDelete} onOpenChange={(open) => !open && setPromotionToDelete(null)}>
-        <AlertDialogContent>
+            <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -296,7 +297,7 @@ const VendorPromotions = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmDeletePromotion}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive/90"
             >
               Delete
             </AlertDialogAction>
