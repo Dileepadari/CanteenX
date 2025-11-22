@@ -13,5 +13,5 @@ jobs:
     steps:
       - name: Ping backend
         run: |
-            curl -X OPTIONS https://canteenx.onrender.com/api/awake
+            curl https://canteenx.onrender.com/api/awake
 
