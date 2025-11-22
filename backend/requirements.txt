@@ -2,6 +2,7 @@ alembic==1.15.1
 annotated-types==0.7.0
 anyio==4.9.0
 asyncpg==0.30.0
+bcrypt==4.0.1
 click==8.1.8
 fastapi==0.115.12
 graphql-core==3.2.6
