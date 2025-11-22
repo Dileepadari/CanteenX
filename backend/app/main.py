@@ -94,7 +94,7 @@ async def read_root():
     return {"message": "Hello from the Canteen Management API!"}
 
 # a route to make backend awake on render.com use options for less latency
-@app.options("/api/awake")
+@app.get("/api/awake")
 async def awake():
     return Response(status_code=200)
 
