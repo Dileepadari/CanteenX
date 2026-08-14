@@ -1,27 +1,29 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { Link } from "react-router-dom";
 
-const NotFound = () => {
-  const location = useLocation();
+import { CanteenXMark } from "@/components/brand/Logo";
+import { Button } from "@/components/ui/button";
 
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
-
+export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
+    <div className="grain flex min-h-dvh flex-col items-center justify-center bg-background px-4 text-center">
+      <div className="relative z-[2]">
+        <CanteenXMark className="mx-auto h-14 w-14 text-primary opacity-40" />
+        <p className="mt-6 font-display text-6xl font-semibold tracking-tight">404</p>
+        <h1 className="mt-2 font-display text-xl font-semibold">
+          That page is off the menu
+        </h1>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          The link may be out of date, or the page may have moved.
+        </p>
+        <div className="mt-7 flex justify-center gap-3">
+          <Button asChild>
+            <Link to="/">Back home</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/menu">Browse the menu</Link>
+          </Button>
+        </div>
       </div>
     </div>
   );
-};
-
-export default NotFound;
+}

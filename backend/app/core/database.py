@@ -1,63 +1,104 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import time
-import logging
-import os
-from dotenv import load_dotenv
+"""Async SQLAlchemy engine, session factory, and the request-scoped unit of work."""
 
-# Load environment variables from .env file
-load_dotenv()
+from __future__ import annotations
 
-# Set up logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import ssl
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 
-# PostgreSQL connection URL - Read from environment variable
-# Fallback to local docker setup if DATABASE_URL is not set
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg2://admin:password@db:5432/smartcanteen"
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
+from sqlalchemy.orm import DeclarativeBase
 
-# For Supabase, you can also construct the URL from individual components
-if not os.getenv("DATABASE_URL"):
-    db_user = os.getenv("DB_USER")
-    db_password = os.getenv("DB_PASSWORD")
-    db_host = os.getenv("DB_HOST")
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME", "postgres")
-    
-    if all([db_user, db_password, db_host]):
-        SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-        logger.info(f"Using constructed database URL with host: {db_host}")
+from app.core.config import settings
 
-logger.info(f"Connecting to database at: {SQLALCHEMY_DATABASE_URL.split('@')[1] if '@' in SQLALCHEMY_DATABASE_URL else 'unknown'}")
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "db", "postgres"}
 
-# Create SQLAlchemy engine with connection pooling optimized for Supabase
-# Supabase free tier has connection limits, so we use conservative pool settings
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,  # Test connections before using them
-    pool_recycle=300,    # Recycle connections after 5 minutes (important for Supabase)
-    pool_size=5,         # Maximum number of connections to keep in pool (conservative for free tier)
-    max_overflow=2,      # Allow up to 2 connections beyond pool_size if needed
-    connect_args={
-        "connect_timeout": 10,  # 10 second connection timeout
-        "options": "-c timezone=utc"  # Set timezone to UTC
+
+def _connect_args() -> dict[str, Any]:
+    """asyncpg connect args.
+
+    Two things differ from the psycopg2 setup this replaces:
+
+    * TLS is passed as an `ssl` context, not libpq's `sslmode` query parameter
+      (which asyncpg rejects outright - `config.py` strips it from the URL).
+    * `statement_cache_size=0` is required behind PgBouncer in transaction
+      pooling mode (Supabase port 6543), where prepared statements do not
+      survive between checkouts. It is harmless on the session pooler.
+    """
+    primary_host = settings.database_url.hosts()[0]
+    host = primary_host.get("host") or ""
+    port = primary_host.get("port")
+    args: dict[str, Any] = {
+        "timeout": 10,
+        "server_settings": {
+            "timezone": "UTC",
+            "application_name": "canteenx-api",
+        },
     }
+
+    if host not in _LOCAL_HOSTS:
+        context = ssl.create_default_context()
+        args["ssl"] = context
+
+    if port == 6543:
+        args["statement_cache_size"] = 0
+        args["prepared_statement_cache_size"] = 0
+
+    return args
+
+
+engine = create_async_engine(
+    str(settings.database_url),
+    echo=settings.db_echo,
+    pool_pre_ping=True,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_recycle=settings.db_pool_recycle_seconds,
+    connect_args=_connect_args(),
 )
 
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionFactory = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
-# Create declarative base for models
-Base = declarative_base()
 
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
+class Base(DeclarativeBase):
+    """Declarative base for every model."""
+
+
+@asynccontextmanager
+async def session_scope() -> AsyncIterator[AsyncSession]:
+    """One transaction, committed once at the end.
+
+    The previous build committed inside every repository method, which made a
+    multi-step operation (debit wallet, write payment, confirm order) impossible
+    to roll back - a crash halfway through left money missing. Services here
+    never commit; this scope owns the transaction boundary.
+    """
+    session = SessionFactory()
     try:
-        yield db
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
     finally:
-        db.close()
+        await session.close()
+
+
+async def get_session() -> AsyncIterator[AsyncSession]:
+    """FastAPI dependency wrapping :func:`session_scope`."""
+    async with session_scope() as session:
+        yield session
+
+
+async def dispose_engine() -> None:
+    await engine.dispose()
