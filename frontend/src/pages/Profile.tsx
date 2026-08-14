@@ -1,274 +1,237 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import MainLayout from "@/components/layout/MainLayout";
-import { useUserStore } from "@/stores/userStore";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useMutation, useQuery } from "@apollo/client";
+import { toast } from "sonner";
+
+import { PageHeader, Spinner } from "@/components/common";
+import { ImageUploadField } from "@/components/common/ImageUploadField";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { Edit2, Save, User, LogOut, Clock, CreditCard, CreditCardIcon } from "lucide-react";
-import { GET_CURRENT_USER_QUERY } from "@/gql/queries/user_queries";
-import { UPDATE_USER_PROFILE } from "@/gql/mutations/user_mutations";
-import { useMutation } from "@apollo/client";
+import { Switch } from "@/components/ui/switch";
+import {
+  CHANGE_PASSWORD,
+  FAVORITE_CANTEENS,
+  ME,
+  UPDATE_PROFILE,
+} from "@/graphql/operations";
+import { CanteenCard } from "@/components/canteen/CanteenCard";
+import { useSession } from "@/stores/session";
 
-const Profile = () => {
-  const { user, logout } = useUserStore();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+export default function Profile() {
+  const { data } = useQuery(ME);
+  const setUser = useSession((state) => state.setUser);
+  const favorites = useQuery(FAVORITE_CANTEENS);
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
-  const [addingCredits, setAddingCredits] = useState(false);
-  const [creditAmount, setCreditAmount] = useState(100);
+  const me = data?.me;
 
-  const [updateUserProfile, { loading }] = useMutation(UPDATE_USER_PROFILE, {
-    refetchQueries: [{ query: GET_CURRENT_USER_QUERY }],
-  });
+  const [name, setName] = useState(me?.name ?? "");
+  const [phone, setPhone] = useState(me?.phone ?? "");
+  const [upiId, setUpiId] = useState(me?.upiId ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(me?.avatarUrl ?? null);
+  const [isVegetarian, setVegetarian] = useState(me?.isVegetarian ?? false);
+  const [initialised, setInitialised] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      setName(user.name);
-      setEmail(user.email);
-    }
-  }, [user]);
-
-  const handleLogout = async () => {
-    await logout();
-    toast({
-      title: "Logged out successfully",
-      description: "You have been logged out from your account",
-    });
-    navigate("/login");
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      await updateUserProfile({
-        variables: {
-          name,
-          email,
-        },
-      });
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been updated",
-      });
-      setIsEditing(false);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update profile.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAddCredits = () => {
-    // This should be a mutation to the backend
-    toast({
-      title: "Credits added",
-      description: `${creditAmount} credits have been added to your account`,
-    });
-    setAddingCredits(false);
-  };
-
-  if (!user) {
-    return (
-      <MainLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <p>Loading user profile...</p>
-        </div>
-      </MainLayout>
-    );
+  // Seed the form once the query lands, without clobbering later edits.
+  if (me && !initialised) {
+    setName(me.name);
+    setPhone(me.phone ?? "");
+    setUpiId(me.upiId ?? "");
+    setAvatarUrl(me.avatarUrl ?? null);
+    setVegetarian(me.isVegetarian);
+    setInitialised(true);
   }
 
+  const [updateProfile, updateState] = useMutation(UPDATE_PROFILE, {
+    refetchQueries: [{ query: ME }],
+  });
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      const { data: saved } = await updateProfile({
+        variables: {
+          input: {
+            name,
+            phone: phone || null,
+            upiId: upiId || null,
+            avatarUrl,
+            isVegetarian,
+          },
+        },
+      });
+      if (saved?.updateProfile && me) {
+        setUser({ ...me, ...saved.updateProfile });
+      }
+      toast.success("Profile saved");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save your profile.",
+      );
+    }
+  };
+
   return (
-    <MainLayout>
-  <div className="min-h-screen bg-gradient-to-br from-muted to-white">
-        <div className="container px-4 py-8 mx-auto max-w-4xl">
-          <h1 className="mb-6 text-3xl font-bold text-primary">Your Profile</h1>
+    <div>
+      <PageHeader
+        eyebrow="Your account"
+        title="Profile"
+        description="Your details, preferences, and saved canteens."
+      />
 
-          <div className="flex flex-col md:flex-row gap-6">
-            <Card className="md:w-1/3 border border-border shadow-md">
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center space-y-4">
-                  <Avatar className="w-24 h-24 border-2 border-border">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`} />
-                    <AvatarFallback className="text-2xl bg-muted/10 text-primary">
-                      {user.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <form onSubmit={save} className="surface space-y-5 p-5">
+          <h2 className="font-display text-base font-semibold">Details</h2>
 
-                  <div className="text-center">
-                    <h2 className="text-xl font-bold">{user.name}</h2>
-                    <p className="text-gray-500">{user.email}</p>
-                    <div className="mt-1 text-sm bg-muted/10 text-primary px-2 py-1 rounded-full inline-block capitalize">
-                      {user.role}
-                    </div>
-                  </div>
+          <ImageUploadField
+            kind="avatar"
+            label="Profile photo"
+            value={avatarUrl}
+            onChange={setAvatarUrl}
+          />
 
-                  <div className="w-full p-3 bg-muted/10 rounded-lg text-center mt-2">
-                    <p className="text-sm text-gray-500">Canteen Balance</p>
-                    <p className="text-2xl font-bold text-primary">₹{user.canteenCredits || 0}</p>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="w-full border-border text-primary hover:bg-muted"
-                    onClick={() => setAddingCredits(true)}
-                  >
-                    <CreditCardIcon className="w-4 h-4 mr-2" /> Add Credits
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    className="w-full border-border text-destructive hover:bg-destructive/10"
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="w-4 h-4 mr-2" /> Logout
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex-1">
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="w-full grid grid-cols-2 bg-muted/10">
-                  <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                    Personal Details
-                  </TabsTrigger>
-                  <TabsTrigger value="preferences" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                    Preferences
-                  </TabsTrigger>
-                  {user?.role?.toLowerCase() === 'vendor' && (
-                    <TabsTrigger value="vendor" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                      Vendor
-                    </TabsTrigger>
-                  )}
-                  {user?.role?.toLowerCase() === 'admin' && (
-                    <TabsTrigger value="admin" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-                      Admin
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-
-                <TabsContent value="details" className="mt-4 animate-fade-in">
-                  <Card className="border border-border shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle>Personal Information</CardTitle>
-                        <CardDescription>Manage your personal details</CardDescription>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsEditing(!isEditing)}
-                      >
-                        <Edit2 className="w-4 h-4 text-primary" />
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">Full Name</Label>
-                          {isEditing ? (
-                            <Input
-                              id="name"
-                              value={name}
-                              onChange={(e) => setName(e.target.value)}
-                              className="border-border"
-                            />
-                          ) : (
-                            <div className="py-2 px-3 bg-gray-50 rounded-md">{user.name}</div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          {isEditing ? (
-                            <Input
-                              id="email"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="border-border"
-                            />
-                          ) : (
-                            <div className="py-2 px-3 bg-gray-50 rounded-md">{user.email}</div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Role</Label>
-                          <div className="py-2 px-3 bg-gray-50 rounded-md capitalize">{user.role}</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                    {isEditing && (
-                      <CardFooter>
-                        <Button
-                          className="bg-primary hover:bg-primary/90 ml-auto"
-                          onClick={handleSaveProfile}
-                          disabled={loading}
-                        >
-                          {loading ? 'Saving...' : (
-                            <>
-                              <Save className="w-4 h-4 mr-2" /> Save Changes
-                            </>
-                          )}
-                        </Button>
-                      </CardFooter>
-                    )}
-                  </Card>
-                </TabsContent>
-                {user?.role?.toLowerCase() === 'vendor' && (
-                  <TabsContent value="vendor" className="mt-4 animate-fade-in">
-                    <Card className="border border-border shadow-md">
-                      <CardHeader>
-                        <CardTitle>Vendor Settings</CardTitle>
-                        <CardDescription>Manage your canteen and vendor preferences</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm">Link to vendor dashboard and canteen settings.</p>
-                        <div className="mt-4">
-                          <Button asChild>
-                            <a href="/vendor/dashboard">Open Vendor Dashboard</a>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )}
-
-                {user?.role?.toLowerCase() === 'admin' && (
-                  <TabsContent value="admin" className="mt-4 animate-fade-in">
-                    <Card className="border border-border shadow-md">
-                      <CardHeader>
-                        <CardTitle>Admin Tools</CardTitle>
-                        <CardDescription>Access admin dashboard and moderation tools</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm">Open the admin dashboard to manage canteens, users and complaints.</p>
-                        <div className="mt-4">
-                          <Button asChild>
-                            <a href="/admin/dashboard">Open Admin Dashboard</a>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                )}
-              </Tabs>
-            </div>
+          <div>
+            <Label htmlFor="name">Full name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="mt-1.5"
+              required
+            />
           </div>
+
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              value={me?.email ?? ""}
+              disabled
+              className="mt-1.5"
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Your email cannot be changed here.
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="upi">UPI ID</Label>
+            <Input
+              id="upi"
+              value={upiId}
+              onChange={(event) => setUpiId(event.target.value)}
+              placeholder="name@bank"
+              className="mt-1.5"
+            />
+          </div>
+
+          <label className="flex items-center justify-between gap-4 rounded-lg border border-border p-3.5">
+            <span>
+              <span className="block text-sm font-medium">Vegetarian</span>
+              <span className="block text-xs text-muted-foreground">
+                Highlight vegetarian dishes across the app
+              </span>
+            </span>
+            <Switch checked={isVegetarian} onCheckedChange={setVegetarian} />
+          </label>
+
+          <Button type="submit" disabled={updateState.loading}>
+            {updateState.loading && <Spinner className="mr-2" />}
+            Save changes
+          </Button>
+        </form>
+
+        <div className="space-y-6">
+          <PasswordCard />
+
+          <section>
+            <h2 className="mb-3 font-display text-base font-semibold">
+              Saved canteens
+            </h2>
+            {(favorites.data?.favoriteCanteens.length ?? 0) === 0 ? (
+              <p className="surface p-5 text-sm text-muted-foreground">
+                You have not saved any canteens yet.
+              </p>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {favorites.data?.favoriteCanteens.map((canteen) => (
+                  <CanteenCard key={canteen.id} canteen={canteen} />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
-};
+}
 
-export default Profile;
+function PasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [changePassword, { loading }] = useMutation(CHANGE_PASSWORD);
+  const signOut = useSession((state) => state.signOut);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await changePassword({
+        variables: { currentPassword: current, newPassword: next },
+      });
+      // The server revokes every session on a password change, so the local
+      // one has to go too rather than lingering in a broken state.
+      toast.success("Password changed. Please sign in again.");
+      await signOut();
+      window.location.href = "/signin";
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not change your password.",
+      );
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="surface space-y-4 p-5">
+      <h2 className="font-display text-base font-semibold">Password</h2>
+      <div>
+        <Label htmlFor="current-password">Current password</Label>
+        <Input
+          id="current-password"
+          type="password"
+          value={current}
+          onChange={(event) => setCurrent(event.target.value)}
+          autoComplete="current-password"
+          className="mt-1.5"
+          required
+        />
+      </div>
+      <div>
+        <Label htmlFor="new-password">New password</Label>
+        <Input
+          id="new-password"
+          type="password"
+          value={next}
+          onChange={(event) => setNext(event.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          className="mt-1.5"
+          required
+        />
+      </div>
+      <Button type="submit" variant="outline" disabled={loading}>
+        {loading && <Spinner className="mr-2" />}
+        Change password
+      </Button>
+    </form>
+  );
+}

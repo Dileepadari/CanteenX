@@ -1,69 +1,54 @@
-version: '3.8'
-
 services:
-  frontend:
-    build: ./frontend
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./frontend:/app           # hot reload support
-      - /app/node_modules         # prevent host node_modules from interfering
-    command: npm run dev
-    depends_on:
-      - backend
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      sh -c "
-      echo 'Waiting for database to be ready...' &&
-      while ! nc -z db 5432; do
-        sleep 1;
-        echo 'Waiting for database connection...';
-      done &&
-      echo 'Database is ready!' &&
-      python -m app.helpers.mock_data &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
-    volumes:
-      - ./backend/app:/app/app  # maps local code for hot reload
-    ports:
-      - "8000:8000"
-    environment:
-      - PYTHONPATH=/app
-    depends_on:
-      - db
-
   db:
-    image: postgres:13
+    image: postgres:16-alpine
     environment:
-      POSTGRES_DB: smartcanteen
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # Add persistent storage
+      POSTGRES_USER: canteenx
+      POSTGRES_PASSWORD: canteenx
+      POSTGRES_DB: canteenx
+    ports: ["55432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d smartcanteen"]
+      test: ["CMD-SHELL", "pg_isready -U canteenx -d canteenx"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  nginx:
-    image: nginx:latest
-    container_name: nginx
+  api:
+    build: ./backend
+    # Migrations run as a release step, then the server starts. The app never
+    # creates tables itself - Alembic is the only source of schema truth.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      DATABASE_URL: postgresql://canteenx:canteenx@db:5432/canteenx
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-at-least-32-characters-long}
+      ENVIRONMENT: development
+      CORS_ORIGINS: http://localhost:8080
+      SEED_PASSWORD: ${SEED_PASSWORD:-canteenx-dev-2026}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      ORACLE_UPLOAD_BASE_URL: ${ORACLE_UPLOAD_BASE_URL:-}
+      ORACLE_PUBLIC_BASE_URL: ${ORACLE_PUBLIC_BASE_URL:-}
+      ORACLE_UPLOAD_API_KEY: ${ORACLE_UPLOAD_API_KEY:-}
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl  # Mount SSL certificates
-    ports:
-      - "80:80"
-      - "443:443"  # Expose HTTPS
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+    ports: ["8000:8000"]
     depends_on:
-      - frontend
-      - backend
+      db: { condition: service_healthy }
+
+  web:
+    build: ./frontend
+    command: npm run dev -- --host 0.0.0.0
+    environment:
+      VITE_DEV_API_TARGET: http://api:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports: ["8080:8080"]
+    depends_on: [api]
 
 volumes:
-  postgres_data:  # Define the volume
+  postgres_data:

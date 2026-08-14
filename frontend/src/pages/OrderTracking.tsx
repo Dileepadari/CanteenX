@@ -1,501 +1,292 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import MainLayout from '@/components/layout/MainLayout';
+import { useEffect } from "react";
+import { useMutation, useQuery, useSubscription } from "@apollo/client";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Check, MapPin, Phone } from "lucide-react";
+import { toast } from "sonner";
+
+import { ErrorState, PageHeader, PageLoader } from "@/components/common";
+import { Money } from "@/components/common/Money";
 import {
-  Clock,
-  CheckCircle,
-  XCircle,
-  ChefHat,
-  Package,
-  Truck,
-  Phone,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
-import { formatIST } from '@/lib/ist';
-import { useQuery } from '@apollo/client';
-import { GET_ORDER_BY_ID } from '@/gql/queries/orders';
-import { GET_MENU_ITEMS } from '@/gql/queries/menuItems';
+  ORDER_STATUS,
+  ORDER_TIMELINE,
+  PAYMENT_STATUS,
+  StatusPill,
+} from "@/components/common/StatusPill";
+import { Button } from "@/components/ui/button";
+import {
+  CANCEL_ORDER,
+  MY_ORDERS,
+  ORDER,
+  ORDER_STATUS_SUBSCRIPTION,
+} from "@/graphql/operations";
+import { formatDateTime, formatTime } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
 
-// Order status badge component
-const OrderStatusBadge = ({ status, className = '' }) => {
-  let bgColor = 'bg-gray-200';
-  let textColor = 'text-gray-700';
-
-  switch (status) {
-    case 'pending':
-      bgColor = 'bg-muted/10';
-      textColor = 'text-primary';
-      break;
-    case 'confirmed':
-      bgColor = 'bg-primary/10';
-      textColor = 'text-primary';
-      break;
-    case 'preparing':
-      bgColor = 'bg-muted/10';
-      textColor = 'text-primary';
-      break;
-    case 'ready':
-      bgColor = 'bg-primary/10';
-      textColor = 'text-primary';
-      break;
-    case 'delivered':
-      bgColor = 'bg-primary/10';
-      textColor = 'text-primary';
-      break;
-    case 'cancelled':
-      bgColor = 'bg-destructive/10';
-      textColor = 'text-destructive';
-      break;
-  }
-
-  return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${bgColor} ${textColor} ${className}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-};
-
-const OrderTracking = () => {
+/**
+ * Live order tracking.
+ *
+ * The timeline is driven by real `orderStatusEvents` from the server and
+ * updated by a WebSocket subscription. The previous implementation simulated
+ * progress on the client with a 60-second interval, so what it displayed had
+ * no connection to what the kitchen was doing.
+ */
+export default function OrderTracking() {
   const { id } = useParams<{ id: string }>();
-  const orderId = id;
+  const orderId = Number(id);
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [order, setOrder] = useState(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  // Load order data from GraphQL query
-  const { loading, error, data } = useQuery(GET_ORDER_BY_ID, {
-    variables: { orderId: parseInt(orderId) },
-    fetchPolicy: "network-only",
+
+  const { data, loading, error, refetch } = useQuery(ORDER, {
+    variables: { id: orderId },
+    skip: !Number.isFinite(orderId),
   });
 
+  useSubscription(ORDER_STATUS_SUBSCRIPTION, {
+    variables: { orderId },
+    skip: !Number.isFinite(orderId),
+    onError: (subscriptionError) =>
+      console.error("[canteenx:sub] orderStatus failed", subscriptionError),
+    onData: ({ data: payload }) => {
+      const update = payload.data?.orderStatus;
+      if (!update) return;
+      const descriptor = ORDER_STATUS[update.status];
+      toast.info(descriptor?.label ?? "Order updated");
+      void refetch();
+    },
+  });
+
+  const [cancelOrder, cancelState] = useMutation(CANCEL_ORDER, {
+    refetchQueries: [{ query: MY_ORDERS, variables: { limit: 40 } }],
+  });
+
+  const order = data?.order;
+
+  // A terminal order has nothing left to track; the detail page is the right
+  // place for it.
   useEffect(() => {
-    if (data && data.getOrderById) {
-      setOrder(data.getOrderById);
-    } else if (data && !data.getOrderById) {
-      toast({
-        title: 'Order Not Found',
-        description: 'The requested order could not be found.',
-        variant: 'destructive',
+    if (order && (order.status === "COMPLETED" || order.status === "CANCELLED")) {
+      navigate(`/orders/${order.id}`, { replace: true });
+    }
+  }, [order, navigate]);
+
+  if (loading && !data) return <PageLoader label="Loading your order" />;
+
+  if (error || !order) {
+    return (
+      <ErrorState
+        title="Order not found"
+        description="This order does not exist, or it is not yours."
+        onRetry={() => void refetch()}
+      />
+    );
+  }
+
+  const reachedIndex = ORDER_TIMELINE.indexOf(
+    order.status as (typeof ORDER_TIMELINE)[number],
+  );
+
+  const handleCancel = async () => {
+    try {
+      await cancelOrder({
+        variables: { orderId: order.id, reason: "Cancelled by customer" },
       });
-    }
-  }, [data, toast]);
-
-  // Update current time every minute
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Format time function
-  const formatTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    return formatIST(dateString, { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Calculate estimated time remaining
-  const getEstimatedTime = () => {
-    if (!order) return null;
-
-    switch (order.status) {
-      case 'pending':
-        return '15-20 min';
-      case 'confirmed':
-        return '10-15 min';
-      case 'preparing':
-        return '5-10 min';
-      case 'ready':
-        return 'Ready now';
-      case 'delivered':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return 'Unknown';
+      toast.success("Order cancelled");
+      navigate(`/orders/${order.id}`);
+    } catch (mutationError) {
+      toast.error(
+        mutationError instanceof Error
+          ? mutationError.message
+          : "Could not cancel this order.",
+      );
     }
   };
-
-  // Safe numeric helpers and derived amounts to avoid NaN in UI
-  const toNumber = (v: any) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  const itemsList = order?.items || [];
-  // Fetch menu items (used to enrich order items with name/price when order doesn't snapshot them)
-  const { data: menuData } = useQuery(GET_MENU_ITEMS, { fetchPolicy: 'cache-first' });
-  const menuItems = menuData?.getMenuItems || [];
-  const menuById: Record<number, any> = menuItems.reduce((acc: any, it: any) => {
-    acc[it.id] = it;
-    return acc;
-  }, {} as Record<number, any>);
-  const subtotalCalc = order
-    ? typeof order.subtotal === 'number'
-      ? order.subtotal
-      : itemsList.reduce((sum: number, it: any) => {
-          const menuPrice = menuById[it.itemId]?.price;
-          return sum + (toNumber(it.price) || toNumber(menuPrice)) * toNumber(it.quantity);
-        }, 0)
-    : 0;
-
-  const taxAmount = order
-    ? typeof order.tax === 'number'
-      ? order.tax
-      : typeof order.taxPercentage === 'number'
-      ? +(subtotalCalc * (order.taxPercentage / 100))
-      : typeof order.totalAmount === 'number'
-      ? Math.max(0, toNumber(order.totalAmount) - subtotalCalc)
-      : 0
-    : 0;
-
-  const totalCalc = order
-    ? typeof order.totalAmount === 'number'
-      ? order.totalAmount
-      : +(subtotalCalc + taxAmount)
-    : 0;
-
-  // Totals used for distribution when item-level prices are not available
-  const totalQuantity = itemsList.reduce((s: number, it: any) => s + toNumber(it.quantity), 0) || 1;
-  const baseAmountForDistribution = typeof order?.subtotal === 'number' && order.subtotal > 0
-    ? order.subtotal
-    : typeof order?.totalAmount === 'number'
-    ? Math.max(0, order.totalAmount - taxAmount)
-    : subtotalCalc;
-
-  // Handle contact canteen
-  const handleContactCanteen = () => {
-    toast({
-      title: 'Contacting Canteen',
-      description: 'This feature is not available in the demo.',
-    });
-  };
-
-  if (loading) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 text-primary animate-spin mr-2" />
-            <span>Loading order details...</span>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-8">
-              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-              <h2 className="text-xl font-bold mb-2">Error Loading Order</h2>
-              <p className="text-gray-500 mb-6">{error.message}</p>
-              <Button onClick={() => window.location.reload()}>Try Again</Button>
-            </CardContent>
-          </Card>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (!order) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center p-8">
-              <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-              <h2 className="text-xl font-bold mb-2">Order Not Found</h2>
-              <p className="text-gray-500 mb-6">We couldn't find the order you're looking for.</p>
-              <Button onClick={() => navigate('/menu')}>Browse Menu</Button>
-            </CardContent>
-          </Card>
-        </div>
-      </MainLayout>
-    );
-  }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Order #{order.id}</h1>
-          <OrderStatusBadge status={order.status} className="ml-4" />
-        </div>
+    <div>
+      <PageHeader
+        eyebrow={order.canteenName ?? undefined}
+        title={`Order ${order.reference}`}
+        description={`Placed ${formatDateTime(order.createdAt)}`}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusPill status={order.status} />
+            <StatusPill status={order.paymentStatus} map={PAYMENT_STATUS} />
+          </div>
+        }
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Order status and tracking */}
-          <div className="md:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <div>
-                    <p className="text-sm text-gray-500">Order Placed</p>
-                    <p className="font-medium">{formatTime(order.orderTime)}</p>
-                  </div>
+      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+        <div className="space-y-6">
+          {/* --- timeline --- */}
+          <section className="surface p-5 sm:p-6" aria-live="polite">
+            <h2 className="font-display text-base font-semibold">Progress</h2>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Current Status</p>
-                    <OrderStatusBadge status={order.status} />
-                  </div>
+            <ol className="mt-5 space-y-0">
+              {ORDER_TIMELINE.map((step, index) => {
+                const descriptor = ORDER_STATUS[step];
+                const event = order.statusEvents.find(
+                  (candidate) => candidate.status === step,
+                );
+                const done = index <= reachedIndex;
+                const current = index === reachedIndex;
+                const Icon = descriptor?.icon ?? Check;
 
-                  <div>
-                    <p className="text-sm text-gray-500">Estimated Time</p>
-                    <p className="font-medium">{getEstimatedTime()}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-gray-500">Current Time</p>
-                    <p className="font-medium">
-                      {formatIST(currentTime, { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Progress tracker */}
-                <div className="space-y-8">
-                  {/* Order confirmation / Cancellation */}
-                  <div className="flex relative">
-                    <div
-                      className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                        order.status === 'cancelled'
-                          ? 'bg-destructive'
-                          : ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)
-                          ? 'bg-primary'
-                          : 'bg-muted'
-                      } z-10`}
-                    >
-                      {order.status === 'cancelled' ? (
-                        <XCircle className="h-5 w-5 text-white" />
-                      ) : ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status) ? (
-                        <CheckCircle className="h-5 w-5 text-white" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-gray-500" />
+                return (
+                  <li key={step} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                          done
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-muted-foreground",
+                          current && "ring-4 ring-primary/15",
+                        )}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden />
+                      </span>
+                      {index < ORDER_TIMELINE.length - 1 && (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "w-0.5 flex-1",
+                            index < reachedIndex ? "bg-primary" : "bg-border",
+                          )}
+                          style={{ minHeight: "2rem" }}
+                        />
                       )}
                     </div>
-                    <div className="ml-4">
-                      <h3 className="font-medium">
-                        {order.status === 'cancelled' ? 'Order Cancelled' : 'Order Confirmed'}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {order.confirmedTime ? formatTime(order.confirmedTime) : 'Awaiting confirmation'}
-                      </p>
-                      <p className="text-sm mt-1">
-                        {order.status === 'cancelled'
-                          ? order.cancellationReason || 'Your order has been cancelled.'
-                          : ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)
-                          ? 'Your order has been confirmed and is being processed.'
-                          : 'The canteen is reviewing your order.'}
-                      </p>
-                    </div>
-                  </div>
 
-                  {/* Preparing */}
-                  {order.status !== 'cancelled' && (
-                    <div className="flex relative">
-                      <div
-                        className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                          ['preparing', 'ready', 'delivered'].includes(order.status)
-                            ? 'bg-primary'
-                            : 'bg-muted'
-                        } z-10`}
-                      >
-                        <ChefHat
-                          className={`h-5 w-5 ${
-                            ['preparing', 'ready', 'delivered'].includes(order.status)
-                              ? 'text-white'
-                              : 'text-gray-500'
-                          }`}
-                        />
-                      </div>
-                      <div className="ml-4">
-                        <h3 className="font-medium">Preparing Your Order</h3>
-                        <p className="text-sm text-gray-500">
-                          {order.preparingTime ? formatTime(order.preparingTime) : 'Not started yet'}
-                        </p>
-                        <p className="text-sm mt-1">
-                          {['preparing', 'ready', 'delivered'].includes(order.status)
-                            ? 'Your food is being prepared in the kitchen.'
-                            : 'Waiting to start preparation.'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Ready for pickup */}
-                  {order.status !== 'cancelled' && (
-                    <div className="flex relative">
-                      <div
-                        className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                            ['ready', 'delivered'].includes(order.status) ? 'bg-primary' : 'bg-muted'
-                          } z-10`}
-                      >
-                        <Package
-                          className={`h-5 w-5 ${
-                            ['ready', 'delivered'].includes(order.status) ? 'text-white' : 'text-gray-500'
-                          }`}
-                        />
-                      </div>
-                      <div className="ml-4">
-                        <h3 className="font-medium">Ready for Pickup</h3>
-                        <p className="text-sm text-gray-500">
-                          {order.readyTime ? formatTime(order.readyTime) : 'Not ready yet'}
-                        </p>
-                        <p className="text-sm mt-1">
-                          {['ready', 'delivered'].includes(order.status)
-                            ? 'Your order is ready! Please proceed to the pickup counter.'
-                            : 'Your order is still being prepared.'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Delivered */}
-                  {order.status !== 'cancelled' && (
-                    <div className="flex relative">
-                      <div
-                        className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                          order.status === 'delivered' ? 'bg-primary' : 'bg-muted'
-                          } z-10`}
-                      >
-                        {order.status === 'delivered' ? (
-                          <CheckCircle className="h-5 w-5 text-white" />
-                        ) : (
-                          <Truck className="h-5 w-5 text-gray-500" />
+                    <div className="flex-1 pb-8">
+                      <p
+                        className={cn(
+                          "font-medium",
+                          !done && "text-muted-foreground",
                         )}
-                      </div>
-                      <div className="ml-4">
-                        <h3 className="font-medium">Order Completed</h3>
-                        <p className="text-sm text-gray-500">
-                          {order.deliveryTime ? formatTime(order.deliveryTime) : 'Pending pickup'}
+                      >
+                        {descriptor?.label ?? step}
+                      </p>
+                      {event ? (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {formatTime(event.createdAt)}
+                          {event.note ? ` - ${event.note}` : ""}
                         </p>
-                        <p className="text-sm mt-1">
-                          {order.status === 'delivered'
-                            ? 'You have received your order. Enjoy your meal!'
-                            : 'Waiting for you to pick up your order.'}
-                        </p>
-                      </div>
+                      ) : (
+                        current && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            In progress
+                          </p>
+                        )
+                      )}
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  </li>
+                );
+              })}
+            </ol>
 
-          {/* Order details */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Order Items</h3>
-                  <div className="space-y-2 mt-2">
-                    {console.log(order?.items)}
-                    {itemsList.map((item: any, index: number) => {
-                      // Use item.price if provided by order snapshot; otherwise use menu item price if available
-                      const menuPrice = menuById[item.itemId]?.price;
-                      const unit = toNumber(item.price) || toNumber(menuPrice);
-                      const qty = toNumber(item.quantity);
-                      // If unit price is present use it; otherwise distribute base amount by quantity share
-                      const line = unit > 0
-                        ? +(unit * qty)
-                        : +(baseAmountForDistribution * (qty / totalQuantity));
+            {order.readyEstimateAt && reachedIndex < 3 && (
+              <p className="rounded-lg bg-accent-soft px-4 py-3 text-sm text-accent">
+                Estimated ready by {formatTime(order.readyEstimateAt)}
+              </p>
+            )}
+          </section>
 
-                      const displayName = menuById[item.itemId]?.name || item.note || `Item ${item.itemId}`;
-
-                      return (
-                        <div key={index} className="flex justify-between py-2 border-b last:border-b-0">
-                          <div>
-                            <p className="font-medium">
-                              {qty}x {displayName}
-                            </p>
-                            {item.customizations && (
-                              <div className="text-xs text-gray-500">
-                                {item.customizations.size && <span>Size: {item.customizations.size} </span>}
-                                {item.customizations.additions?.length > 0 && (
-                                  <span>
-                                    Additions: {item.customizations.additions.join(', ')}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <p>₹{line.toFixed(2)}</p>
-                        </div>
-                      );
-                    })}
+          {/* --- items --- */}
+          <section className="surface p-5">
+            <h2 className="font-display text-base font-semibold">Items</h2>
+            <ul className="mt-4 space-y-3">
+              {order.items.map((item) => (
+                <li key={item.id} className="flex justify-between gap-4 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {item.quantity}x {item.name}
+                    </p>
+                    {item.customizationSummary && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.customizationSummary}
+                      </p>
+                    )}
+                    {item.note && (
+                      <p className="mt-0.5 text-xs italic text-muted-foreground">
+                        &ldquo;{item.note}&rdquo;
+                      </p>
+                    )}
                   </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <div className="flex justify-between mb-1">
-                    <span>Subtotal</span>
-                    <span>₹{subtotalCalc.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-500 mb-1">
-                    <span>
-                      {typeof order?.taxPercentage === 'number' ? `Tax (${order.taxPercentage}%)` : 'Tax'}
-                    </span>
-                    <span>₹{taxAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total</span>
-                    <span>₹{totalCalc.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Payment Information</h3>
-                  <div className="flex justify-between mb-1">
-                    <span>Payment Method</span>
-                    <span>{order.paymentMethod}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Payment Status</span>
-                    <span
-                      className={
-                        order.paymentStatus === 'Paid'
-                          ? 'text-primary font-medium'
-                          : 'text-muted-foreground font-medium'
-                      }
-                    >
-                      {order.paymentStatus}
-                    </span>
-                  </div>
-                </div>
-
-                {order.customerNote && (
-                  <div className="pt-4 border-t">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Order Notes</h3>
-                    <p className="text-sm bg-muted/10 p-2 rounded">{order.customerNote}</p>
-                  </div>
-                )}
-
-                <div className="pt-4">
-                  <Button className="w-full" onClick={handleContactCanteen}>
-                    <Phone className="mr-2 h-4 w-4" /> Contact Canteen
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  <Money value={item.lineTotal} size="sm" className="shrink-0" />
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
-      </div>
-    </MainLayout>
-  );
-};
 
-export default OrderTracking;
+        {/* --- summary --- */}
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <div className="surface p-5">
+            <h2 className="font-display text-base font-semibold">Summary</h2>
+            <dl className="mt-4 space-y-2.5 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Subtotal</dt>
+                <dd>
+                  <Money value={order.subtotal} />
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Tax</dt>
+                <dd>
+                  <Money value={order.tax} />
+                </dd>
+              </div>
+              {order.discount.paise > 0 && (
+                <div className="flex justify-between text-success">
+                  <dt>Discount</dt>
+                  <dd>-{order.discount.formatted}</dd>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2.5">
+                <dt className="font-semibold">Total</dt>
+                <dd>
+                  <Money value={order.total} size="lg" />
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="surface space-y-3 p-5 text-sm">
+            {order.canteenName && (
+              <p className="flex items-start gap-2">
+                <MapPin
+                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                {order.canteenName}
+              </p>
+            )}
+            {order.contactPhone && (
+              <p className="flex items-start gap-2">
+                <Phone
+                  className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                {order.contactPhone}
+              </p>
+            )}
+          </div>
+
+          {order.canCancel && (
+            <Button
+              variant="outline"
+              className="w-full text-destructive hover:bg-destructive-soft"
+              disabled={cancelState.loading}
+              onClick={() => void handleCancel()}
+            >
+              Cancel order
+            </Button>
+          )}
+
+          <Button asChild variant="ghost" className="w-full">
+            <Link to="/orders">All orders</Link>
+          </Button>
+        </aside>
+      </div>
+    </div>
+  );
+}
