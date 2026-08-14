@@ -1,149 +1,317 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* CanteenX design system.
+ *
+ * Palette is built from the ADK DEV brand violet (#49256B) with a saffron
+ * accent. Warm paper ground rather than clinical white, because the product is
+ * about food.
+ *
+ * Architecture mirrors the portfolio project: Tailwind v4 `@theme inline`
+ * mapping `--color-*` onto HSL custom properties, tokens defined on `:root`
+ * and overridden under `.dark`.
+ */
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:opsz,wght@14..32,100..900&family=JetBrains+Mono:wght@400..700&display=swap");
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Tailwind v4 has no JS config; dark mode is a variant targeting `.dark`. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-soft: hsl(var(--primary-soft));
+  --color-primary-muted: hsl(var(--primary-muted));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-soft: hsl(var(--accent-soft));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-success-soft: hsl(var(--success-soft));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warning-soft: hsl(var(--warning-soft));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-soft: hsl(var(--destructive-soft));
+
+  --color-border: hsl(var(--border));
+  --color-border-strong: hsl(var(--border-strong));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-xs: 0 1px 2px hsl(var(--shadow-tint) / 0.06);
+  --shadow-sm: 0 1px 3px hsl(var(--shadow-tint) / 0.08), 0 1px 2px hsl(var(--shadow-tint) / 0.04);
+  --shadow-md: 0 4px 12px hsl(var(--shadow-tint) / 0.08), 0 2px 4px hsl(var(--shadow-tint) / 0.04);
+  --shadow-lg: 0 12px 28px hsl(var(--shadow-tint) / 0.12), 0 4px 8px hsl(var(--shadow-tint) / 0.05);
+
+  --animate-fade-in: fade-in 0.3s ease-out forwards;
+  --animate-slide-up: slide-up 0.4s ease-out forwards;
+  --animate-scale-in: scale-in 0.2s ease-out forwards;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+}
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 265 4% 12.9%;
+    /* --- Violet + Saffron, light ------------------------------------- */
+    --background: 36 33% 97%;        /* #FBF8F4 warm paper */
+    --foreground: 280 19% 10%;       /* #1C1420 ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 265 4% 12.9%;
-
+    --card-foreground: 280 19% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 265 4% 12.9%;
+    --popover-foreground: 280 19% 10%;
 
-    --primary: 266 4% 20.8%;
-    --primary-foreground: 248 0.3% 98.4%;
+    --primary: 274 49% 28%;          /* #49256B brand violet */
+    --primary-foreground: 36 33% 97%;
+    --primary-soft: 274 40% 40%;     /* #6B3A94 lifted */
+    --primary-muted: 274 45% 95%;    /* tinted surface */
 
-    --secondary: 248 0.7% 96.8%;
-    --secondary-foreground: 266 4% 20.8%;
+    --accent: 34 79% 50%;            /* #E08A1E saffron */
+    --accent-foreground: 280 19% 10%;
+    --accent-soft: 34 80% 95%;
 
-    --muted: 248 0.7% 96.8%;
-    --muted-foreground: 257 4.6% 55.4%;
+    /* Distinct on purpose. The previous theme gave --secondary, --muted, and
+       --accent the identical off-white, so three utilities rendered the same. */
+    --secondary: 30 24% 93%;
+    --secondary-foreground: 274 49% 28%;
+    --muted: 33 20% 94%;
+    --muted-foreground: 276 6% 42%;  /* #6B6472 */
 
-    --accent: 248 0.7% 96.8%;
-    --accent-foreground: 266 4% 20.8%;
-
-    --destructive: 27 24.5% 57.7%;
+    --success: 158 45% 34%;          /* #2F7D5C basil */
+    --success-foreground: 0 0% 100%;
+    --success-soft: 158 40% 94%;
+    --warning: 34 79% 50%;
+    --warning-foreground: 280 19% 10%;
+    --warning-soft: 34 80% 94%;
+    --destructive: 9 71% 41%;        /* #B4341F chili */
     --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 9 70% 95%;
 
-    --border: 256 1.3% 92.9%;
-    --input: 256 1.3% 92.9%;
-    --ring: 257 4% 70.4%;
+    --border: 33 29% 86%;            /* #E6DED3 warm hairline */
+    --border-strong: 33 22% 76%;
+    --input: 33 29% 86%;
+    --ring: 274 49% 40%;
 
-    --radius: 0.375rem;
+    /* Categorical, ordered by hue distance so adjacent series stay separable
+       and none of them collide with the status colours above. */
+    --chart-1: 274 49% 40%;
+    --chart-2: 34 79% 50%;
+    --chart-3: 158 45% 40%;
+    --chart-4: 320 45% 52%;
+    --chart-5: 199 60% 42%;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 265 4% 12.9%;
-
-    --sidebar-primary: 266 4% 20.8%;
-
-    --sidebar-primary-foreground: 248 0.3% 98.4%;
-
-    --sidebar-accent: 248 0.7% 96.8%;
-
-    --sidebar-accent-foreground: 266 4% 20.8%;
-
-    --sidebar-border: 256 1.3% 92.9%;
-
-    --sidebar-ring: 257 4% 70.4%;
-
-    --chart-1: 41 22.2% 64.6%;
-
-    --chart-2: 185 11.8% 60%;
-
-    --chart-3: 227 7% 39.8%;
-
-    --chart-4: 84 18.9% 82.8%;
-
-    --chart-5: 70 18.8% 76.9%;
-
-    --sidebar: 248 0.3% 98.4%;
-
-    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-
-    --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
-
-    --tracking-normal: 0em;
-
-    --spacing: 0.25rem;
+    --radius: 0.75rem;
+    --shadow-tint: 280 30% 12%;
   }
 
   .dark {
-    --background: 0 0% 15%;
-    --foreground: 248 0.3% 98.4%;
+    /* --- Violet + Saffron, dark -------------------------------------- */
+    --background: 275 21% 8%;        /* #14101A aubergine ink */
+    --foreground: 280 33% 95%;       /* #F3EFF7 */
 
-    --card: 266 4% 20.8%;
-    --card-foreground: 248 0.3% 98.4%;
+    --card: 277 22% 13%;             /* #1E1826 */
+    --card-foreground: 280 33% 95%;
+    --popover: 277 22% 13%;
+    --popover-foreground: 280 33% 95%;
 
-    --popover: 266 4% 20.8%;
-    --popover-foreground: 248 0.3% 98.4%;
+    --primary: 274 57% 72%;          /* #B98CE0 lifted for contrast on dark */
+    --primary-foreground: 275 21% 8%;
+    --primary-soft: 274 55% 80%;
+    --primary-muted: 275 25% 18%;
 
-    --primary: 256 1.3% 92.9%;
-    --primary-foreground: 266 4% 20.8%;
+    --accent: 36 86% 59%;            /* #F0A93F */
+    --accent-foreground: 275 21% 8%;
+    --accent-soft: 36 30% 20%;
 
-    --secondary: 260 4.1% 27.9%;
-    --secondary-foreground: 248 0.3% 98.4%;
+    --secondary: 276 18% 20%;
+    --secondary-foreground: 280 33% 95%;
+    --muted: 276 16% 18%;
+    --muted-foreground: 278 11% 61%; /* #9A8FA6 */
 
-    --muted: 260 4.1% 27.9%;
-    --muted-foreground: 257 4% 70.4%;
+    --success: 158 37% 49%;          /* #4FA97F */
+    --success-foreground: 275 21% 8%;
+    --success-soft: 158 25% 18%;
+    --warning: 36 86% 59%;
+    --warning-foreground: 275 21% 8%;
+    --warning-soft: 36 30% 20%;
+    --destructive: 9 72% 58%;        /* #E05A45 */
+    --destructive-foreground: 275 21% 8%;
+    --destructive-soft: 9 35% 20%;
 
-    --accent: 260 4.1% 27.9%;
-    --accent-foreground: 248 0.3% 98.4%;
+    --border: 277 19% 19%;           /* #2E2739 */
+    --border-strong: 277 16% 28%;
+    --input: 277 19% 19%;
+    --ring: 274 57% 72%;
 
-    --destructive: 22 19.1% 70.4%;
-    --destructive-foreground: 248 0.3% 98.4%;
+    --chart-1: 274 57% 72%;
+    --chart-2: 36 86% 59%;
+    --chart-3: 158 37% 55%;
+    --chart-4: 320 55% 68%;
+    --chart-5: 199 60% 60%;
 
-    --border: 0 0% 100% / 10%;
-    --input: 0 0% 100% / 15%;
-    --ring: 264 2.7% 55.1%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 248 0.3% 98.4%;
-    --sidebar-primary: 264 24.3% 48.8%;
-    --sidebar-primary-foreground: 248 0.3% 98.4%;
-    --sidebar-accent: 260 4.1% 27.9%;
-    --sidebar-accent-foreground: 248 0.3% 98.4%;
-    --sidebar-border: 0 0% 100% / 10%;
-    --sidebar-ring: 264 2.7% 55.1%;
-    --chart-1: 264 24.3% 48.8%;
-    --chart-2: 162 17% 69.6%;
-    --chart-3: 70 18.8% 76.9%;
-    --chart-4: 304 26.5% 62.7%;
-    --chart-5: 16 24.6% 64.5%;
-    --sidebar: 266 4% 20.8%;
+    --shadow-tint: 275 60% 3%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
+
+  /* Tabular figures keep prices and totals from jittering as they update. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* The paper grain. Subtle enough to read as texture rather than noise, and
+     it is what stops large flat areas looking like default framework output. */
+  .grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .dark .grain::before {
+    opacity: 0.05;
+  }
+
+  .hover-lift {
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .surface {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+  }
+
+  /* A hairline rule that fades out, used under section headers. */
+  .rule {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      hsl(var(--border-strong)),
+      hsl(var(--border) / 0)
+    );
+  }
+
+  .stagger > * {
+    opacity: 0;
+    animation: var(--animate-slide-up);
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0.02s; }
+  .stagger > *:nth-child(2) { animation-delay: 0.06s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.1s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.14s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.18s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.22s; }
+  .stagger > *:nth-child(n + 7) { animation-delay: 0.26s; }
+}
+
+/* Wide content must scroll inside its own container. Admin tables previously
+   overflowed the page body on phones because nothing wrapped them. */
+@layer utilities {
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 }

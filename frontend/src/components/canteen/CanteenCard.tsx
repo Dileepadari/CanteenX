@@ -1,63 +1,84 @@
-
-import React from "react";
 import { Link } from "react-router-dom";
-import { Clock, MapPin, Star } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { getPlaceholderImage, ensureImageSrc } from '@/lib/image';
+import { MapPin, Star } from "lucide-react";
 
-interface CanteenCardProps {
-  canteen: {
-    id: number;
-    name: string;
-    image: string;
-    location: string;
-    rating: number;
-    openTime: string;
-    closeTime: string;
-    isOpen: boolean;
-  };
+import { Image } from "@/components/common/Image";
+import { cn } from "@/lib/utils";
+
+interface CanteenSummary {
+  id: number;
+  name: string;
+  location?: string | null;
+  bannerUrl?: string | null;
+  rating: number;
+  isOpenNow: boolean;
+  menuItemCount: number;
+  tags: string[];
 }
 
-const CanteenCard: React.FC<CanteenCardProps> = ({ canteen }) => {
+export function CanteenCard({ canteen }: { canteen: CanteenSummary }) {
   return (
-    <Link to={`/canteen/${canteen.id}`}>
-      <Card className="overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
-        <div className="relative h-48 w-full overflow-hidden">
-          <img
-            src={ensureImageSrc(canteen.image, canteen.id, 800, 480)}
-            alt={canteen.name}
-            className="h-full w-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).src = getPlaceholderImage(canteen.id, 800, 480); }}
-          />
-          <div className="absolute top-3 right-3">
-            <Badge variant={canteen.isOpen ? "success" : "destructive"}>
-              {canteen.isOpen ? "Open" : "Closed"}
-            </Badge>
-          </div>
+    <Link
+      to={`/canteens/${canteen.id}`}
+      className="surface hover-lift group flex flex-col overflow-hidden focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="relative">
+        <Image
+          src={canteen.bannerUrl}
+          alt={canteen.name}
+          seed={canteen.id}
+          aspect="video"
+          rounded={false}
+          className="group-hover:[&>img]:scale-105"
+        />
+        <span
+          className={cn(
+            "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold",
+            canteen.isOpenNow
+              ? "bg-success text-success-foreground"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          {canteen.isOpenNow ? "Open" : "Closed"}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-display text-base font-semibold leading-tight">
+            {canteen.name}
+          </h3>
+          {canteen.rating > 0 && (
+            <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
+              <Star className="h-3 w-3 fill-accent text-accent" aria-hidden />
+              {canteen.rating.toFixed(1)}
+            </span>
+          )}
         </div>
-        <CardContent className="p-4">
-          <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold">{canteen.name}</h3>
-            <div className="flex items-center">
-              <Star className="h-4 w-4 text-primary mr-1" />
-              <span className="text-sm font-medium">{canteen.rating}</span>
-            </div>
+
+        {canteen.location && (
+          <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+            <span className="truncate">{canteen.location}</span>
+          </p>
+        )}
+
+        {canteen.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {canteen.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md bg-secondary px-2 py-0.5 text-[0.6875rem] font-medium text-secondary-foreground"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <div className="flex items-center">
-              <MapPin className="h-4 w-4 mr-1" />
-              <span>{canteen.location}</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="h-4 w-4 mr-1" />
-              <span>{canteen.openTime} - {canteen.closeTime}</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        )}
+
+        <p className="mt-auto pt-3 text-xs text-muted-foreground">
+          {canteen.menuItemCount} item{canteen.menuItemCount === 1 ? "" : "s"}
+        </p>
+      </div>
     </Link>
   );
-};
-
-export default CanteenCard;
+}

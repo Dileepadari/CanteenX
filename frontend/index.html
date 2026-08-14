@@ -1,20 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CanteenX</title>
-    <meta name="description" content="CanteenX - Revolutionizing campus dining" />
-    <meta name="author" content="Dileep Kumar Adari" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>CanteenX - Skip the campus canteen queue</title>
+    <meta
+      name="description"
+      content="Order ahead from your campus canteens, pay digitally, track your order live, and pick up without waiting."
+    />
 
-    <meta property="og:title" content="CanteenX" />
-    <meta property="og:description" content="CanteenX - Revolutionizing campus dining" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Matches the palette so mobile browser chrome does not flash white on
+         a dark page (and vice versa). -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#FBF8F4" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14101A" />
+
     <meta property="og:type" content="website" />
-
+    <meta property="og:title" content="CanteenX" />
+    <meta
+      property="og:description"
+      content="Order ahead from your campus canteens and skip the queue."
+    />
+    <meta property="og:image" content="/og-image.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@dileepkumaradari" />
-  </head>
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <script>
+      // Apply the stored theme before first paint. Without this the page
+      // renders light, then snaps to dark once React mounts.
+      (function () {
+        try {
+          var stored = localStorage.getItem("canteenx-theme") || "system";
+          var dark =
+            stored === "dark" ||
+            (stored === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch (error) {
+          /* localStorage unavailable in private mode; fall back to light. */
+        }
+      })();
+    </script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
