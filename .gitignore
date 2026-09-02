@@ -13,3 +13,7 @@ coverage/
 .idea/
 *.pyc
 backend/.venv/
+# Next.js build output
+.next/
+frontend/.next/
+out/
