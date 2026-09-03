@@ -16,7 +16,7 @@ import os
 import random
 from datetime import UTC, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.database import session_scope
 from app.core.logging import configure_logging, get_logger
@@ -24,15 +24,155 @@ from app.core.security import hash_password
 from app.db.models import (
     Canteen,
     MenuItem,
+    Order,
+    OrderStatus,
+    PaymentMethod,
     Promotion,
     PromotionType,
     User,
     UserRole,
     UserWallet,
 )
+from app.domain.services import (
+    cart_service,
+    order_service,
+    payment_service,
+    wallet_service,
+)
 from app.domain.services.catalog_service import slugify
 
 logger = get_logger(__name__)
+
+
+#: One order per status, so every screen that filters or groups by status has
+#: something to show. Without these the orders list, the vendor queue and the
+#: analytics page are all empty on a fresh install, which makes the app look
+#: broken rather than new.
+SEED_ORDERS: tuple[tuple[OrderStatus, str], ...] = (
+    (OrderStatus.PENDING, "Extra napkins please."),
+    (OrderStatus.CONFIRMED, None),
+    (OrderStatus.PREPARING, "No onions."),
+    (OrderStatus.READY, None),
+    (OrderStatus.COMPLETED, None),
+    (OrderStatus.CANCELLED, "Changed my mind."),
+)
+
+
+def _default_customizations(item: MenuItem) -> dict[str, list[str]]:
+    """Pick the first option of every required group.
+
+    Menu items carry required option groups such as Size, so an order cannot be
+    placed without choosing one. The seed takes the first option rather than a
+    random one, so a re-seed produces the same basket and the same totals.
+    """
+    selection: dict[str, list[str]] = {}
+    for group in item.customization_groups or []:
+        if not group.get("required"):
+            continue
+        options = group.get("options") or []
+        if options:
+            selection[str(group["id"])] = [str(options[0]["id"])]
+    return selection
+
+
+async def _seed_orders(
+    session, *, student: User, vendor_by_canteen: dict[int, User]
+) -> int:
+    """Place demo orders and walk each to its target status.
+
+    Everything goes through the cart and order services rather than inserting
+    rows, so stock reservations, pricing, status history and the transition
+    rules are all exercised exactly as they are for a real order.
+    """
+    existing = await session.scalar(
+        select(func.count()).select_from(Order).where(Order.user_id == student.id)
+    )
+    if existing:
+        return 0
+
+    # The seeded wallet balance covers a couple of orders, not six. Top it up so
+    # every status below can actually be reached, and so the wallet screen has a
+    # transaction history rather than a single opening balance.
+    await wallet_service.credit(
+        session,
+        user_id=student.id,
+        amount_paise=500_000,
+        description="Demo top-up",
+    )
+    await session.flush()
+
+    created = 0
+    for index, (target, note) in enumerate(SEED_ORDERS):
+        canteen_id = list(vendor_by_canteen)[index % len(vendor_by_canteen)]
+        items = (
+            await session.scalars(
+                select(MenuItem)
+                .where(
+                    MenuItem.canteen_id == canteen_id, MenuItem.is_available.is_(True)
+                )
+                .limit(2)
+            )
+        ).all()
+        if not items:
+            continue
+
+        await cart_service.clear_cart(session, user_id=student.id)
+        for position, item in enumerate(items):
+            await cart_service.add_item(
+                session,
+                user_id=student.id,
+                menu_item_id=item.id,
+                quantity=1 + (position % 2),
+                customizations=_default_customizations(item),
+                replace_cart_if_different_canteen=True,
+            )
+
+        # Wallet, not UPI: it settles outright without a gateway round trip, and
+        # an order has to be paid before it can be completed.
+        order = await order_service.create_order(
+            session,
+            user=student,
+            payment_method=PaymentMethod.WALLET,
+            customer_note=note,
+        )
+        await session.flush()
+
+        # Paying moves an order straight to confirmed, so the two statuses that
+        # exist before payment are left unpaid on purpose.
+        if target not in (OrderStatus.PENDING, OrderStatus.CANCELLED):
+            await payment_service.initiate(session, user=student, order_id=order.id)
+            await session.flush()
+
+        # Walk the real transition graph rather than assigning the status, so a
+        # seeded order has the same history rows a live one would. Paying already
+        # moves an order to confirmed, so the walk starts from wherever the
+        # payment left it rather than from pending.
+        vendor = vendor_by_canteen[canteen_id]
+        pipeline = (
+            OrderStatus.CONFIRMED,
+            OrderStatus.PREPARING,
+            OrderStatus.READY,
+            OrderStatus.COMPLETED,
+        )
+        if target is OrderStatus.CANCELLED:
+            await order_service.transition_status(
+                session,
+                actor=vendor,
+                order_id=order.id,
+                new_status=OrderStatus.CANCELLED,
+            )
+        elif target is not OrderStatus.PENDING:
+            reached = pipeline.index(order.status) if order.status in pipeline else -1
+            for step in pipeline[reached + 1 : pipeline.index(target) + 1]:
+                await order_service.transition_status(
+                    session, actor=vendor, order_id=order.id, new_status=step
+                )
+        await session.flush()
+        created += 1
+
+    await cart_service.clear_cart(session, user_id=student.id)
+    return created
+
 
 DEFAULT_PASSWORD = os.getenv("SEED_PASSWORD", "canteenx-dev-2026")
 
@@ -360,6 +500,8 @@ async def seed() -> None:
             password=DEFAULT_PASSWORD,
         )
 
+        vendor_by_canteen: dict[int, User] = {}
+
         for index, spec in enumerate(CANTEENS, start=1):
             vendor = await _upsert_user(
                 session,
@@ -390,6 +532,7 @@ async def seed() -> None:
             canteen.is_accepting_orders = True
             canteen.is_active = True
             await session.flush()
+            vendor_by_canteen[canteen.id] = vendor
 
             for name, description, price, category, is_veg, groups in spec["items"]:
                 item = await session.scalar(
@@ -438,6 +581,9 @@ async def seed() -> None:
             promotion.is_active = True
 
         await session.flush()
+        orders_created = await _seed_orders(
+            session, student=student, vendor_by_canteen=vendor_by_canteen
+        )
 
         logger.info(
             "Seed complete",
@@ -445,6 +591,7 @@ async def seed() -> None:
                 "admin": admin.email,
                 "student": student.email,
                 "canteens": len(CANTEENS),
+                "orders": orders_created,
             },
         )
 
@@ -452,7 +599,8 @@ async def seed() -> None:
     print(f"  admin    admin@canteenx.dev      {DEFAULT_PASSWORD}")
     print(f"  student  student@canteenx.dev    {DEFAULT_PASSWORD}")
     print(f"  vendor   vendor1@canteenx.dev    {DEFAULT_PASSWORD}")
-    print(f"\n{len(CANTEENS)} canteens with menus and promotions.\n")
+    print(f"\n{len(CANTEENS)} canteens with menus and promotions.")
+    print(f"{orders_created} demo orders across every status.\n")
 
 
 if __name__ == "__main__":
