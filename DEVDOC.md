@@ -1,6 +1,31 @@
-# Developer Guide
+# CanteenX - Developer Documentation
 
-Setup, configuration, and deployment for CanteenX. For what the product does, see [README.md](./README.md).
+Technical reference for the CanteenX codebase. For what the app does from a user's point of
+view, see [README.md](./README.md).
+
+## Table of contents
+
+- [Prerequisites](#prerequisites)
+- [1. Clone and install](#1-clone-and-install)
+- [2. Start a database](#2-start-a-database)
+- [3. Configure the backend](#3-configure-the-backend)
+- [4. Migrate and seed](#4-migrate-and-seed)
+- [5. Configure the frontend](#5-configure-the-frontend)
+- [6. Run it](#6-run-it)
+- [Architecture](#architecture)
+- [Working on the API](#working-on-the-api)
+- [Working on the frontend](#working-on-the-frontend)
+- [Real-time](#real-time)
+- [Storage contract](#storage-contract)
+- [Payments](#payments)
+- [Seed and demo data](#seed-and-demo-data)
+- [Continuous integration](#continuous-integration)
+- [Security notes](#security-notes)
+- [Documentation](#documentation)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+- [Contributors](#contributors)
+- [Glossary](#glossary)
 
 ## Prerequisites
 
@@ -103,6 +128,42 @@ cd frontend && npm run dev        # http://localhost:8080
 
 GraphiQL is at `http://localhost:8000/api/graphql` outside production.
 
+## Architecture
+
+```mermaid
+flowchart TD
+  WEB["React SPA<br/>frontend/src"]
+  APOLLO["Apollo Client<br/>generated hooks from codegen"]
+  GQL["Strawberry GraphQL<br/>app/api/graphql"]
+  PERM["permissions.py<br/>role policies, every field named"]
+  REST["REST<br/>app/api/rest: payments, uploads"]
+  SVC["Domain services<br/>app/domain/services"]
+  PRICE["pricing.py<br/>option validation and totals"]
+  MODELS["SQLAlchemy models<br/>app/db/models"]
+  PG[("PostgreSQL")]
+  ALEMBIC["Alembic<br/>the only schema authority"]
+  RZP["Razorpay"]
+  WS["WebSocket subscriptions"]
+
+  WEB --> APOLLO --> GQL
+  GQL --> PERM
+  GQL --> SVC
+  REST --> SVC
+  SVC --> PRICE
+  SVC --> MODELS --> PG
+  ALEMBIC --> PG
+  REST -- "signed idempotent webhook" --> RZP
+  SVC -- "order status events" --> WS --> WEB
+```
+
+Two layers of authorization, deliberately separated. **Permission classes** gate by role and are
+declarative and cheap. **Services** enforce object-level ownership, because "is this order yours"
+needs the loaded row and cannot live in a permission class.
+
+`app/domain/pricing.py` is shared by the cart and the ordering service, so a basket total and the
+order it becomes are computed by the same code. Prices are never taken from the client: only
+option ids are, and their deltas are looked up here.
+
 ## Working on the API
 
 ```sh
@@ -170,6 +231,70 @@ The webhook is deliberately CSRF-exempt and cookie-less; its HMAC is its only ga
 
 There is no client-assertable "mark paid" route, and no mock processor. Absent keys disable payment with a clear error.
 
+## Seed and demo data
+
+`python -m scripts.seed` is idempotent: re-running updates rather than duplicating.
+
+| Entity | What it creates |
+|---|---|
+| Users | 1 admin, 4 vendors (one per canteen), 2 students, each with a wallet |
+| Canteens | 4, with weekly schedules, prep times, tags and contact details |
+| Menu | 24 items across 11 categories, with required option groups and stock counts |
+| Promotions | Active percentage and flat-amount codes with redemption caps |
+| Orders | **One in every status**: pending, confirmed, preparing, ready, completed, cancelled |
+| Wallet | A top-up plus a debit per paid order, so the transaction history is real |
+
+Orders are placed through `cart_service` and `order_service` rather than inserted, so stock
+reservations, customization pricing, payment settlement and the status-history rows are all
+produced exactly as they are for a live order. The pending and cancelled orders are left
+unpaid on purpose, because paying moves an order straight to confirmed.
+
+Passwords come from `$SEED_PASSWORD` (default `canteenx-dev-2026` in development), never from
+a literal in the file.
+
+## Continuous integration
+
+`.github/workflows/ci.yml`, on push and PR.
+
+| Job | Runs |
+|---|---|
+| **backend** | `ruff check`, `ruff format --check`, `mypy`, a migrations-from-empty check, a model/migration drift check, then `pytest` |
+| **frontend** | `eslint`, `tsc --noEmit`, `vite build` |
+
+The drift check is the important one: it fails if the models and the migrations disagree, which
+is what keeps Alembic the single schema authority rather than a thing people remember to update.
+
+## Security notes
+
+### Built in
+
+| Concern | How it is handled |
+|---|---|
+| Password storage | argon2 by default, with transparent rehash on login. Legacy bcrypt hashes are still verified so existing accounts keep working |
+| SSO accounts | `verify_password` returns False for a null hash instead of raising, so an SSO user hitting the password form gets a failed login rather than a 500 |
+| Token confusion | Every token carries a `typ` claim that `decode_token` requires. Without it a long-lived refresh token, which carries no role, would be accepted as an access token |
+| WebSocket auth | Subscriptions authenticate with a 60-second single-purpose realtime ticket fetched over HTTP, because a cookie refreshed later never reaches an already-open socket |
+| CSRF | Double-submit cookie plus `x-csrf-token` header on state-changing requests |
+| Authorization | Declarative role policies on every GraphQL field, plus object-level ownership checks in the services |
+| Price tampering | The client sends option **ids** only. Deltas and totals are looked up server-side in `pricing.py` and shared by the cart and the order |
+| Payment integrity | Orders are marked paid by a signed, idempotent Razorpay webhook, never by a client callback |
+| Status integrity | `ORDER_STATUS_TRANSITIONS` is an explicit table; anything not listed is rejected, so an order cannot skip or reverse |
+
+### Dependency posture
+
+`pip-audit` and `npm audit` are worth running before a release. The backend pins argon2 and
+bcrypt directly rather than through passlib, which avoids the passlib 1.7.4 / bcrypt 4.0.1 pair
+that raises `AttributeError: module 'bcrypt' has no attribute '__about__'`.
+
+## Documentation
+
+`README.md` and `README-light.md` are the same page in two themes. GitHub has no theme toggle,
+so the toggle is a pair of files linking to each other. Only `README.md` is edited by hand:
+
+```bash
+node scripts/build-light-readme.mjs
+```
+
 ## Deployment
 
 **Backend** - any container host. The image ships `alembic/`, so run migrations as a release step:
@@ -200,3 +325,26 @@ Point Vercel, Netlify, or Cloudflare Pages at `frontend/` with build command `np
 | `QueuePool limit ... reached` | Something is holding a session for a connection's lifetime. Subscriptions must use `context.db()`. |
 | Cookies ignored in the browser | `COOKIE_SAMESITE=none` requires HTTPS. Use the dev proxy locally instead of `VITE_API_URL`. |
 | `payments_disabled` at checkout | No Razorpay keys configured. Wallet payment still works. |
+
+## Contributors
+
+| Person | Owns |
+|---|---|
+| [Dileep Adari](https://github.com/Dileepadari) | Everything: schema, GraphQL API, payments, frontend and the test suite |
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| **Canteen** | One outlet with its own menu, schedule, vendor and prep time |
+| **Option group** | A required or optional customization set on a menu item, such as Size |
+| **Customization hash** | A stable fingerprint of a selection, used so two identical baskets are one cart line |
+| **Paise** | The integer money unit throughout. Never a float |
+| **Realtime ticket** | A 60-second token minted over HTTP so a WebSocket can authenticate at handshake |
+| **Reservation** | Stock held against an open order, released on cancellation and committed on completion |
+| **Transition table** | `ORDER_STATUS_TRANSITIONS`, the explicit map of which status may follow which |
+
+---
+
+Minor and local implementation notes that do not belong in this document are kept in
+[not_for_you.md](./not_for_you.md).

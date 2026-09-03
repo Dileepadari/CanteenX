@@ -2,5 +2,8 @@
   "devDependencies": {
     "@types/node": "^24.10.1",
     "supabase": "^2.58.5"
+  },
+  "scripts": {
+    "docs:readme-light": "node scripts/build-light-readme.mjs"
   }
 }

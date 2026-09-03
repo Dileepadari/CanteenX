@@ -1,3 +1,5 @@
+<!-- Generated from README.md by scripts/build-light-readme.mjs. Do not edit by hand. -->
+
 <div align="center">
 
 <picture>
@@ -24,7 +26,7 @@
 
 **[Developer documentation](./DEVDOC.md)** · [Features](#features) · [Getting started](#getting-started)
 
-<p><b>Dark mode</b> · <a href="./README-light.md">View this page in light mode</a></p>
+<p><b>Light mode</b> · <a href="./README.md">View this page in dark mode</a></p>
 
 </div>
 
@@ -64,44 +66,44 @@ So the rewrite is organised around making those categories of mistake hard to re
 
 ## Screenshots
 
-Every image is a real 1440x900 viewport render against a seeded local stack. This page shows **dark mode**; the same gallery in light mode is at **[README-light.md](./README-light.md)**.
+Every image is a real 1440x900 viewport render against a seeded local stack. This page shows **light mode**; the same gallery in dark mode is at **[README.md](./README.md)**.
 
 <table>
   <tr>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/01-home.jpg" alt="Landing page with canteens and live open status" loading="lazy">
+      <img src="./docs/screenshots/light/01-home.jpg" alt="Landing page with canteens and live open status" loading="lazy">
       <p align="center"><b>Home</b><br><sub>Every canteen with live open status, and how it works.</sub></p>
     </td>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/02-menu.jpg" alt="Campus-wide menu with category filters and stock counts" loading="lazy">
+      <img src="./docs/screenshots/light/02-menu.jpg" alt="Campus-wide menu with category filters and stock counts" loading="lazy">
       <p align="center"><b>Menu</b><br><sub>Everything on campus, filterable, with live stock.</sub></p>
     </td>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/03-canteens.jpg" alt="Canteen directory with tags and item counts" loading="lazy">
+      <img src="./docs/screenshots/light/03-canteens.jpg" alt="Canteen directory with tags and item counts" loading="lazy">
       <p align="center"><b>Canteens</b><br><sub>Search by name, cuisine or location. Open-now filter.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/04-orders.jpg" alt="Order history showing pending, confirmed, preparing and ready orders" loading="lazy">
+      <img src="./docs/screenshots/light/04-orders.jpg" alt="Order history showing pending, confirmed, preparing and ready orders" loading="lazy">
       <p align="center"><b>Your orders</b><br><sub>Every order with its live status and payment state.</sub></p>
     </td>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/05-wallet.jpg" alt="Wallet balance with a transaction history" loading="lazy">
+      <img src="./docs/screenshots/light/05-wallet.jpg" alt="Wallet balance with a transaction history" loading="lazy">
       <p align="center"><b>Wallet</b><br><sub>Top up once, then settle orders in a single tap.</sub></p>
     </td>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/07-vendor-queue.jpg" alt="Vendor order queue with kitchen notes and status controls" loading="lazy">
+      <img src="./docs/screenshots/light/07-vendor-queue.jpg" alt="Vendor order queue with kitchen notes and status controls" loading="lazy">
       <p align="center"><b>Kitchen queue</b><br><sub>Live orders, kitchen notes, and only the legal next steps.</sub></p>
     </td>
   </tr>
   <tr>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/06-vendor-dashboard.jpg" alt="Vendor dashboard with today's revenue and live queue" loading="lazy">
+      <img src="./docs/screenshots/light/06-vendor-dashboard.jpg" alt="Vendor dashboard with today's revenue and live queue" loading="lazy">
       <p align="center"><b>Vendor dashboard</b><br><sub>Today at a glance, with the live queue beside it.</sub></p>
     </td>
     <td width="33%" valign="top">
-      <img src="./docs/screenshots/dark/08-admin.jpg" alt="Admin platform overview with revenue chart and catalogue counts" loading="lazy">
+      <img src="./docs/screenshots/light/08-admin.jpg" alt="Admin platform overview with revenue chart and catalogue counts" loading="lazy">
       <p align="center"><b>Admin overview</b><br><sub>Revenue, orders, users and the whole catalogue.</sub></p>
     </td>
     <td width="33%" valign="top">
@@ -116,15 +118,15 @@ Ordering happens on a phone between lectures, so the phone layout is the one tha
 <table>
   <tr>
     <td width="22%" valign="top">
-      <img src="./docs/screenshots/responsive/dark/mobile-menu.jpg" alt="Menu at 390px wide" loading="lazy">
+      <img src="./docs/screenshots/responsive/light/mobile-menu.jpg" alt="Menu at 390px wide" loading="lazy">
       <p align="center"><sub><b>Menu</b><br>390 x 844</sub></p>
     </td>
     <td width="22%" valign="top">
-      <img src="./docs/screenshots/responsive/dark/mobile-orders.jpg" alt="Orders at 390px wide" loading="lazy">
+      <img src="./docs/screenshots/responsive/light/mobile-orders.jpg" alt="Orders at 390px wide" loading="lazy">
       <p align="center"><sub><b>Orders</b><br>390 x 844</sub></p>
     </td>
     <td width="46%" valign="top">
-      <img src="./docs/screenshots/responsive/dark/tablet-home.jpg" alt="Home at 820px wide" loading="lazy">
+      <img src="./docs/screenshots/responsive/light/tablet-home.jpg" alt="Home at 820px wide" loading="lazy">
       <p align="center"><sub><b>Home</b><br>820 x 900</sub></p>
     </td>
   </tr>
